@@ -1,14 +1,12 @@
 import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
-export const users = pgTable('users', {
+export const user = pgTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
+  name: text('name'),
   email: text('email').notNull().unique(),
+  emailVerified: timestamp('emailVerified'),
   password: text('password').notNull(),
   image: text('image'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
-
-// Para o mindset SaaS, futuramente podemos adicionar uma tabela de 'tenants' 
-// e um campo 'tenant_id' nos users ou em uma tabela de vinculação.
