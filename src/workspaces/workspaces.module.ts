@@ -8,6 +8,6 @@ import { WorkspaceGuard } from './guards/workspace.guard';
   imports: [AuthModule],
   providers: [WorkspacesService, WorkspaceGuard],
   controllers: [WorkspacesController],
-  exports: [WorkspacesService, WorkspaceGuard],
+  exports: [WorkspacesService, WorkspaceGuard, AuthModule],
 })
 export class WorkspacesModule {}

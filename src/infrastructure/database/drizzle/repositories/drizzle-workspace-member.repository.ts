@@ -3,7 +3,10 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, eq } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
-import { WorkspaceMemberEntity, WorkspaceRole } from '../../../../core/entities/workspace-member.entity';
+import {
+  WorkspaceMemberEntity,
+  WorkspaceRole,
+} from '../../../../core/entities/workspace-member.entity';
 import { IWorkspaceMemberRepository } from '../../../../core/repositories/workspace-member.repository.interface';
 
 @Injectable()
@@ -37,7 +40,10 @@ export class DrizzleWorkspaceMemberRepository implements IWorkspaceMemberReposit
     return new WorkspaceMemberEntity(result);
   }
 
-  async updateRole(id: string, role: WorkspaceRole): Promise<WorkspaceMemberEntity> {
+  async updateRole(
+    id: string,
+    role: WorkspaceRole,
+  ): Promise<WorkspaceMemberEntity> {
     const [result] = await this.db
       .update(schema.workspaceMember)
       .set({ role, updatedAt: new Date() })

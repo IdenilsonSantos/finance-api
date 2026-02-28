@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -33,6 +33,23 @@ export const workspaceMember = pgTable('workspaceMember', {
   role: text('role', { enum: ['owner', 'admin', 'member'] })
     .notNull()
     .default('member'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});
+
+export const bankAccount = pgTable('bankAccount', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  type: text('type', {
+    enum: ['checking', 'savings', 'investment', 'cash'],
+  })
+    .notNull()
+    .default('checking'),
+  color: text('color').notNull().default('#6366f1'),
+  balance: integer('balance').notNull().default(0),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
