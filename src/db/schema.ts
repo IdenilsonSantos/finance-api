@@ -10,3 +10,29 @@ export const user = pgTable('user', {
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
+
+export const workspace = pgTable('workspace', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  ownerId: uuid('ownerId')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});
+
+export const workspaceMember = pgTable('workspaceMember', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  role: text('role', { enum: ['owner', 'admin', 'member'] })
+    .notNull()
+    .default('member'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});

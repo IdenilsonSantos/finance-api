@@ -8,8 +8,7 @@ import {
 
 export class RegisterDto {
   @IsString()
-  @IsOptional()
-  name?: string;
+  name: string;
 
   @IsEmail()
   email: string;

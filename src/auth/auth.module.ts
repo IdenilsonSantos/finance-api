@@ -8,6 +8,10 @@ import { AuthController } from './controllers/auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { IUserRepository } from '../core/repositories/user.repository.interface';
 import { DrizzleUserRepository } from '../infrastructure/database/drizzle/repositories/drizzle-user.repository';
+import { IWorkspaceRepository } from '../core/repositories/workspace.repository.interface';
+import { DrizzleWorkspaceRepository } from '../infrastructure/database/drizzle/repositories/drizzle-workspace.repository';
+import { IWorkspaceMemberRepository } from '../core/repositories/workspace-member.repository.interface';
+import { DrizzleWorkspaceMemberRepository } from '../infrastructure/database/drizzle/repositories/drizzle-workspace-member.repository';
 
 @Module({
   imports: [
@@ -27,11 +31,20 @@ import { DrizzleUserRepository } from '../infrastructure/database/drizzle/reposi
   providers: [
     AuthService,
     JwtStrategy,
+    { provide: IUserRepository, useClass: DrizzleUserRepository },
+    { provide: IWorkspaceRepository, useClass: DrizzleWorkspaceRepository },
     {
-      provide: IUserRepository,
-      useClass: DrizzleUserRepository,
+      provide: IWorkspaceMemberRepository,
+      useClass: DrizzleWorkspaceMemberRepository,
     },
   ],
-  exports: [AuthService, IUserRepository],
+  exports: [
+    AuthService,
+    JwtModule,
+    PassportModule,
+    IUserRepository,
+    IWorkspaceRepository,
+    IWorkspaceMemberRepository,
+  ],
 })
 export class AuthModule {}

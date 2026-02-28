@@ -3,7 +3,7 @@ import { UserEntity } from '../entities/user.entity';
 export interface IUserRepository {
   findById(id: string): Promise<UserEntity | null>;
   findByEmail(email: string): Promise<UserEntity | null>;
-  create(user: Partial<UserEntity>): Promise<UserEntity>;
+  create(user: Partial<UserEntity>, trx?: any): Promise<UserEntity>;
   update(id: string, user: Partial<UserEntity>): Promise<UserEntity>;
 }
 

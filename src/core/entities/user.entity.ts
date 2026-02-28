@@ -5,6 +5,8 @@ export class UserEntity {
   emailVerified?: Date | null;
   password: string;
   image?: string | null;
+  otpCode?: string | null;
+  otpExpiresAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 
