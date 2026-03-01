@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
+import { TransactionsModule } from './transactions/transactions.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
     UsersModule,
     WorkspacesModule,
     BankAccountsModule,
+    TransactionsModule,
   ],
   controllers: [],
   providers: [],
