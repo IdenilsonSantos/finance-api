@@ -8,6 +8,7 @@ import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { ScheduledTransactionsModule } from './scheduled-transactions/scheduled-transactions.module';
+import { BudgetsModule } from './budgets/budgets.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ScheduledTransactionsModule } from './scheduled-transactions/scheduled-
     TransactionsModule,
     TransfersModule,
     ScheduledTransactionsModule,
+    BudgetsModule,
   ],
   controllers: [],
   providers: [],

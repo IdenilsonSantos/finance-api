@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, date } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, date, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -91,6 +91,28 @@ export const scheduledTransaction = pgTable('scheduledTransaction', {
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
+
+export const budget = pgTable(
+  'budget',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspaceId')
+      .notNull()
+      .references(() => workspace.id, { onDelete: 'cascade' }),
+    category: text('category').notNull(),
+    amount: integer('amount').notNull(),
+    month: text('month').notNull(), // YYYY-MM
+    createdAt: timestamp('createdAt').defaultNow().notNull(),
+    updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('budget_workspace_category_month_idx').on(
+      table.workspaceId,
+      table.category,
+      table.month,
+    ),
+  ],
+);
 
 export const transfer = pgTable('transfer', {
   id: uuid('id').primaryKey().defaultRandom(),
