@@ -7,6 +7,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
 import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { TransfersModule } from './transfers/transfers.module';
+import { ScheduledTransactionsModule } from './scheduled-transactions/scheduled-transactions.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { TransfersModule } from './transfers/transfers.module';
     BankAccountsModule,
     TransactionsModule,
     TransfersModule,
+    ScheduledTransactionsModule,
   ],
   controllers: [],
   providers: [],

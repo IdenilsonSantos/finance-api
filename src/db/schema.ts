@@ -71,6 +71,27 @@ export const transaction = pgTable('transaction', {
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
 
+export const scheduledTransaction = pgTable('scheduledTransaction', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  bankAccountId: uuid('bankAccountId')
+    .notNull()
+    .references(() => bankAccount.id, { onDelete: 'cascade' }),
+  amount: integer('amount').notNull(),
+  type: text('type', { enum: ['income', 'expense'] }).notNull(),
+  description: text('description'),
+  category: text('category').notNull(),
+  frequency: text('frequency', {
+    enum: ['daily', 'weekly', 'monthly', 'yearly'],
+  }).notNull(),
+  nextDate: date('nextDate').notNull(),
+  endDate: date('endDate'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});
+
 export const transfer = pgTable('transfer', {
   id: uuid('id').primaryKey().defaultRandom(),
   workspaceId: uuid('workspaceId')
