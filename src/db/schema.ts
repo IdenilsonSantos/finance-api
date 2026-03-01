@@ -70,3 +70,21 @@ export const transaction = pgTable('transaction', {
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
+
+export const transfer = pgTable('transfer', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  fromAccountId: uuid('fromAccountId')
+    .notNull()
+    .references(() => bankAccount.id, { onDelete: 'cascade' }),
+  toAccountId: uuid('toAccountId')
+    .notNull()
+    .references(() => bankAccount.id, { onDelete: 'cascade' }),
+  amount: integer('amount').notNull(),
+  description: text('description'),
+  date: date('date').notNull(),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});

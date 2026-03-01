@@ -6,6 +6,7 @@ import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { TransfersModule } from './transfers/transfers.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TransactionsModule } from './transactions/transactions.module';
     WorkspacesModule,
     BankAccountsModule,
     TransactionsModule,
+    TransfersModule,
   ],
   controllers: [],
   providers: [],
