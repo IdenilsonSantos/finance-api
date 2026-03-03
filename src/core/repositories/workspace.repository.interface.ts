@@ -11,6 +11,7 @@ export interface IWorkspaceRepository {
     id: string,
     workspace: Partial<WorkspaceEntity>,
   ): Promise<WorkspaceEntity>;
+  findOwnerEmail(workspaceId: string): Promise<string | null>;
 }
 
 export const IWorkspaceRepository = Symbol('IWorkspaceRepository');

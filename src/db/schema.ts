@@ -114,6 +114,20 @@ export const budget = pgTable(
   ],
 );
 
+export const goal = pgTable('goal', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  targetAmount: integer('targetAmount').notNull(), // cents
+  currentAmount: integer('currentAmount').notNull().default(0), // cents
+  deadline: date('deadline'),
+  color: text('color').notNull().default('#6366f1'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});
+
 export const transfer = pgTable('transfer', {
   id: uuid('id').primaryKey().defaultRandom(),
   workspaceId: uuid('workspaceId')

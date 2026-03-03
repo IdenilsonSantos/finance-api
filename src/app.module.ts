@@ -9,6 +9,8 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { ScheduledTransactionsModule } from './scheduled-transactions/scheduled-transactions.module';
 import { BudgetsModule } from './budgets/budgets.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { GoalsModule } from './goals/goals.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { BudgetsModule } from './budgets/budgets.module';
     TransfersModule,
     ScheduledTransactionsModule,
     BudgetsModule,
+    NotificationsModule,
+    GoalsModule,
   ],
   controllers: [],
   providers: [],

@@ -21,8 +21,9 @@ export class BudgetsService {
     );
     const duplicate = existing.find((b) => b.category === dto.category);
     if (duplicate) {
+      const [year, month] = dto.month.split('-');
       throw new ConflictException(
-        `Já existe um orçamento para "${dto.category}" em ${dto.month}`,
+        `Já existe um orçamento para "${dto.category}" em ${month}/${year}`,
       );
     }
 

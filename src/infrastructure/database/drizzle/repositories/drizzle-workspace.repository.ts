@@ -49,4 +49,14 @@ export class DrizzleWorkspaceRepository implements IWorkspaceRepository {
       .returning();
     return new WorkspaceEntity(result);
   }
+
+  async findOwnerEmail(workspaceId: string): Promise<string | null> {
+    const result = await this.db
+      .select({ email: schema.user.email })
+      .from(schema.workspace)
+      .innerJoin(schema.user, eq(schema.workspace.ownerId, schema.user.id))
+      .where(eq(schema.workspace.id, workspaceId))
+      .limit(1);
+    return result[0]?.email ?? null;
+  }
 }
