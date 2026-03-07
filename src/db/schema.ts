@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, date, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, date, uniqueIndex, boolean } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -9,6 +9,17 @@ export const user = pgTable('user', {
   image: text('image'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});
+
+export const refreshToken = pgTable('refreshToken', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  tokenHash: text('tokenHash').notNull().unique(),
+  expiresAt: timestamp('expiresAt').notNull(),
+  revoked: boolean('revoked').notNull().default(false),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
 });
 
 export const workspace = pgTable('workspace', {
