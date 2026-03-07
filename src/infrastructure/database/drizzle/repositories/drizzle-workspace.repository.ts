@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { WorkspaceEntity } from '../../../../core/entities/workspace.entity';
@@ -24,6 +24,23 @@ export class DrizzleWorkspaceRepository implements IWorkspaceRepository {
       where: eq(schema.workspace.slug, slug),
     });
     return result ? new WorkspaceEntity(result) : null;
+  }
+
+  async findByUserId(userId: string): Promise<WorkspaceEntity[]> {
+    const members = await this.db
+      .select({ workspaceId: schema.workspaceMember.workspaceId })
+      .from(schema.workspaceMember)
+      .where(eq(schema.workspaceMember.userId, userId));
+
+    if (members.length === 0) return [];
+
+    const ids = members.map((m) => m.workspaceId);
+    const workspaces = await this.db
+      .select()
+      .from(schema.workspace)
+      .where(inArray(schema.workspace.id, ids));
+
+    return workspaces.map((w) => new WorkspaceEntity(w));
   }
 
   async create(

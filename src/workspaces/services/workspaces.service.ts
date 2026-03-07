@@ -40,6 +40,10 @@ export class WorkspacesService {
     return workspace;
   }
 
+  async findByUserId(userId: string) {
+    return this.workspaceRepository.findByUserId(userId);
+  }
+
   async update(id: string, dto: UpdateWorkspaceDto) {
     return this.workspaceRepository.update(id, dto);
   }

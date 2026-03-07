@@ -20,6 +20,11 @@ import { WorkspaceId } from '../decorators/workspace-id.decorator';
 export class WorkspacesController {
   constructor(private readonly workspacesService: WorkspacesService) {}
 
+  @Get('mine')
+  findMine(@GetUser('userId') userId: string) {
+    return this.workspacesService.findByUserId(userId);
+  }
+
   @Post()
   create(@GetUser('userId') userId: string, @Body() dto: CreateWorkspaceDto) {
     return this.workspacesService.create(dto, userId);
