@@ -11,6 +11,7 @@ import { ScheduledTransactionsModule } from './scheduled-transactions/scheduled-
 import { BudgetsModule } from './budgets/budgets.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { GoalsModule } from './goals/goals.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { GoalsModule } from './goals/goals.module';
     BudgetsModule,
     NotificationsModule,
     GoalsModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [],

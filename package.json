@@ -20,7 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "seed": "ts-node -r tsconfig-paths/register src/scripts/seed.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
