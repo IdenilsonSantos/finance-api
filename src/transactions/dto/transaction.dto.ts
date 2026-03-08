@@ -18,8 +18,16 @@ export class CreateTransactionDto {
   @IsString()
   description?: string;
 
+  @IsOptional()
+  @IsString()
+  beneficiary?: string;
+
   @IsString()
   category: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 
   @IsDateString()
   date: string;
@@ -43,12 +51,23 @@ export class UpdateTransactionDto {
   type?: TransactionType;
 
   @IsOptional()
+  @ValidateIf((o) => o.description !== null)
   @IsString()
-  description?: string;
+  description?: string | null;
+
+  @IsOptional()
+  @ValidateIf((o) => o.beneficiary !== null)
+  @IsString()
+  beneficiary?: string | null;
 
   @IsOptional()
   @IsString()
   category?: string;
+
+  @IsOptional()
+  @ValidateIf((o) => o.paymentMethod !== null)
+  @IsString()
+  paymentMethod?: string | null;
 
   @IsOptional()
   @IsDateString()

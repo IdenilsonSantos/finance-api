@@ -7,7 +7,9 @@ export class TransactionEntity {
   amount: number;
   type: TransactionType;
   description: string | null;
+  beneficiary: string | null;
   category: string;
+  paymentMethod: string | null;
   date: string; // ISO date string: YYYY-MM-DD
   createdAt: Date;
   updatedAt: Date;
