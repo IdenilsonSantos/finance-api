@@ -47,4 +47,8 @@ export class WorkspacesService {
   async update(id: string, dto: UpdateWorkspaceDto) {
     return this.workspaceRepository.update(id, dto);
   }
+
+  async delete(id: string): Promise<void> {
+    await this.workspaceRepository.delete(id);
+  }
 }

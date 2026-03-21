@@ -12,6 +12,7 @@ export interface IWorkspaceRepository {
     id: string,
     workspace: Partial<WorkspaceEntity>,
   ): Promise<WorkspaceEntity>;
+  delete(id: string): Promise<void>;
   findOwnerEmail(workspaceId: string): Promise<string | null>;
 }
 

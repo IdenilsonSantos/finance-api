@@ -4,9 +4,13 @@ import {
   Body,
   Get,
   Patch,
+  Delete,
   Param,
   ParseUUIDPipe,
   UseGuards,
+  ForbiddenException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { WorkspacesService } from '../services/workspaces.service';
 import { CreateWorkspaceDto, UpdateWorkspaceDto } from '../dto/workspace.dto';
@@ -44,5 +48,18 @@ export class WorkspacesController {
     @Body() dto: UpdateWorkspaceDto,
   ) {
     return this.workspacesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @GetUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const workspace = await this.workspacesService.findById(id);
+    if (workspace.ownerId !== userId) {
+      throw new ForbiddenException('Apenas o dono pode excluir o workspace');
+    }
+    return this.workspacesService.delete(id);
   }
 }

@@ -67,6 +67,10 @@ export class DrizzleWorkspaceRepository implements IWorkspaceRepository {
     return new WorkspaceEntity(result);
   }
 
+  async delete(id: string): Promise<void> {
+    await this.db.delete(schema.workspace).where(eq(schema.workspace.id, id));
+  }
+
   async findOwnerEmail(workspaceId: string): Promise<string | null> {
     const result = await this.db
       .select({ email: schema.user.email })
