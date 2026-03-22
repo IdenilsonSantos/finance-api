@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte, count } from 'drizzle-orm';
+import { eq, and, gte, lte, count, inArray, isNotNull } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { TransactionEntity } from '../../../../core/entities/transaction.entity';
@@ -86,5 +86,23 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
       );
 
     return Number(result?.count ?? 0);
+  }
+
+  async findExternalIdsByBankAccount(
+    bankAccountId: string,
+    fitIds: string[],
+  ): Promise<string[]> {
+    if (fitIds.length === 0) return [];
+    const results = await this.db
+      .select({ externalId: schema.transaction.externalId })
+      .from(schema.transaction)
+      .where(
+        and(
+          eq(schema.transaction.bankAccountId, bankAccountId),
+          isNotNull(schema.transaction.externalId),
+          inArray(schema.transaction.externalId, fitIds),
+        ),
+      );
+    return results.map((r) => r.externalId!);
   }
 }

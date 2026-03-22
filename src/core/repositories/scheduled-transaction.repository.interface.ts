@@ -13,5 +13,5 @@ export interface IScheduledTransactionRepository {
     data: Partial<ScheduledTransactionEntity>,
     trx?: any,
   ): Promise<ScheduledTransactionEntity>;
-  delete(id: string, workspaceId: string): Promise<void>;
+  delete(id: string, workspaceId: string, trx?: any): Promise<void>;
 }

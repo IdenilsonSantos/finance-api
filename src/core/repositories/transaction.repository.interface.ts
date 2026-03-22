@@ -13,4 +13,8 @@ export interface ITransactionRepository {
     year: number,
     month: number,
   ): Promise<number>;
+  findExternalIdsByBankAccount(
+    bankAccountId: string,
+    fitIds: string[],
+  ): Promise<string[]>;
 }

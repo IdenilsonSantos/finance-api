@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, date, uniqueIndex, boolean, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, date, uniqueIndex, boolean, jsonb, index } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -80,6 +80,7 @@ export const transaction = pgTable('transaction', {
   category: text('category').notNull(),
   paymentMethod: text('paymentMethod'),
   date: date('date').notNull(),
+  externalId: text('externalId'), // FITID do OFX para deduplicação
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
@@ -97,7 +98,7 @@ export const scheduledTransaction = pgTable('scheduledTransaction', {
   description: text('description'),
   category: text('category').notNull(),
   frequency: text('frequency', {
-    enum: ['daily', 'weekly', 'monthly', 'yearly'],
+    enum: ['once', 'daily', 'weekly', 'monthly', 'yearly'],
   }).notNull(),
   nextDate: date('nextDate').notNull(),
   endDate: date('endDate'),
@@ -180,4 +181,31 @@ export const transfer = pgTable('transfer', {
   date: date('date').notNull(),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});
+
+export const categoryRule = pgTable(
+  'categoryRule',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    category: text('category').notNull(),
+    keyword: text('keyword').notNull(),
+    createdAt: timestamp('createdAt').defaultNow().notNull(),
+  },
+  (t) => [index('categoryRule_category_idx').on(t.category)],
+);
+
+export const statementImport = pgTable('statementImport', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  bankAccountId: uuid('bankAccountId')
+    .notNull()
+    .references(() => bankAccount.id, { onDelete: 'cascade' }),
+  fileHash: text('fileHash').notNull(),
+  filename: text('filename'),
+  imported: integer('imported').notNull().default(0),
+  duplicates: integer('duplicates').notNull().default(0),
+  total: integer('total').notNull().default(0),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
 });

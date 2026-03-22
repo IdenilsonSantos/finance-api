@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, lte } from 'drizzle-orm';
+import { eq, and, lte, gte } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { ScheduledTransactionEntity } from '../../../../core/entities/scheduled-transaction.entity';
@@ -28,10 +28,17 @@ export class DrizzleScheduledTransactionRepository
   }
 
   async findAllByWorkspace(workspaceId: string): Promise<ScheduledTransactionEntity[]> {
-    const results = await this.db.query.scheduledTransaction.findMany({
-      where: eq(schema.scheduledTransaction.workspaceId, workspaceId),
-      orderBy: (t, { asc }) => [asc(t.nextDate)],
-    });
+    const today = new Date().toISOString().slice(0, 10);
+    const results = await this.db
+      .select()
+      .from(schema.scheduledTransaction)
+      .where(
+        and(
+          eq(schema.scheduledTransaction.workspaceId, workspaceId),
+          gte(schema.scheduledTransaction.nextDate, today),
+        ),
+      )
+      .orderBy(schema.scheduledTransaction.nextDate);
     return results.map((r) => new ScheduledTransactionEntity(r));
   }
 
@@ -74,8 +81,9 @@ export class DrizzleScheduledTransactionRepository
     return new ScheduledTransactionEntity(result);
   }
 
-  async delete(id: string, workspaceId: string): Promise<void> {
-    await this.db
+  async delete(id: string, workspaceId: string, trx?: any): Promise<void> {
+    const db = trx || this.db;
+    await db
       .delete(schema.scheduledTransaction)
       .where(
         and(

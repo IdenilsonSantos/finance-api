@@ -92,7 +92,9 @@ export class ScheduledTransactionsService {
     );
     if (!account) throw new NotFoundException('Conta bancária não encontrada');
 
-    const nextDate = this.calculateNextDate(scheduled.frequency, scheduled.nextDate);
+    const nextDate = scheduled.frequency !== 'once'
+      ? this.calculateNextDate(scheduled.frequency, scheduled.nextDate)
+      : null;
 
     const result = await this.db.transaction(async (trx) => {
       await this.transactionRepository.create(
@@ -116,10 +118,15 @@ export class ScheduledTransactionsService {
         trx,
       );
 
+      if (scheduled.frequency === 'once') {
+        await this.scheduledTransactionRepository.delete(id, workspaceId, trx);
+        return null;
+      }
+
       return this.scheduledTransactionRepository.update(
         id,
         workspaceId,
-        { nextDate },
+        { nextDate: nextDate as string },
         trx,
       );
     });
@@ -192,7 +199,9 @@ export class ScheduledTransactionsService {
       );
       if (!account) continue;
 
-      const nextDate = this.calculateNextDate(scheduled.frequency, scheduled.nextDate);
+      const nextDate = scheduled.frequency !== 'once'
+        ? this.calculateNextDate(scheduled.frequency, scheduled.nextDate)
+        : null;
 
       await this.db.transaction(async (trx) => {
         await this.transactionRepository.create(
@@ -210,12 +219,21 @@ export class ScheduledTransactionsService {
 
         const delta = scheduled.type === 'income' ? scheduled.amount : -scheduled.amount;
         await this.bankAccountRepository.updateBalance(scheduled.bankAccountId, delta, trx);
-        await this.scheduledTransactionRepository.update(
-          scheduled.id,
-          scheduled.workspaceId,
-          { nextDate },
-          trx,
-        );
+
+        if (scheduled.frequency === 'once') {
+          await this.scheduledTransactionRepository.delete(
+            scheduled.id,
+            scheduled.workspaceId,
+            trx,
+          );
+        } else {
+          await this.scheduledTransactionRepository.update(
+            scheduled.id,
+            scheduled.workspaceId,
+            { nextDate: nextDate as string },
+            trx,
+          );
+        }
       });
 
       const desc = scheduled.description ?? scheduled.category;

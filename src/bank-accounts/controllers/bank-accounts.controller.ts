@@ -10,8 +10,13 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { BankAccountsService } from '../services/bank-accounts.service';
+import { StatementImportService } from '../services/statement-import.service';
 import {
   CreateBankAccountDto,
   UpdateBankAccountDto,
@@ -23,7 +28,10 @@ import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator'
 @Controller('bank-accounts')
 @UseGuards(JwtAuthGuard, WorkspaceGuard)
 export class BankAccountsController {
-  constructor(private readonly bankAccountsService: BankAccountsService) {}
+  constructor(
+    private readonly bankAccountsService: BankAccountsService,
+    private readonly statementImportService: StatementImportService,
+  ) {}
 
   @Post()
   create(
@@ -62,5 +70,42 @@ export class BankAccountsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.bankAccountsService.remove(id, workspaceId);
+  }
+
+  @Post('import-statement')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
+  importStatementAuto(
+    @WorkspaceId() workspaceId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('bankAccountId') bankAccountId?: string,
+    @Body('force') force?: string,
+  ) {
+    if (!file) throw new BadRequestException('Nenhum arquivo enviado');
+    return this.statementImportService.importOFX(
+      bankAccountId ?? null,
+      workspaceId,
+      file.buffer,
+      file.originalname,
+      force === 'true',
+    );
+  }
+
+  @Post(':id/statements/import')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
+  importStatement(
+    @WorkspaceId() workspaceId: string,
+    @Param('id', ParseUUIDPipe) bankAccountId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Nenhum arquivo enviado');
+    return this.statementImportService.importOFX(
+      bankAccountId,
+      workspaceId,
+      file.buffer,
+    );
   }
 }

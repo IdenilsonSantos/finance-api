@@ -73,9 +73,12 @@ export class DashboardService {
             type: schema.transaction.type,
             category: schema.transaction.category,
             description: schema.transaction.description,
+            beneficiary: schema.transaction.beneficiary,
+            paymentMethod: schema.transaction.paymentMethod,
             date: schema.transaction.date,
             bankAccountId: schema.transaction.bankAccountId,
             bankAccountName: schema.bankAccount.name,
+            bankAccountColor: schema.bankAccount.color,
             createdAt: schema.transaction.createdAt,
           })
           .from(schema.transaction)

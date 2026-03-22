@@ -1,6 +1,6 @@
 import type { TransactionType } from './transaction.entity';
 
-export type ScheduledTransactionFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type ScheduledTransactionFrequency = 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export class ScheduledTransactionEntity {
   id: string;

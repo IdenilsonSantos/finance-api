@@ -26,7 +26,7 @@ export class BankAccountsService {
       );
 
       if (initialBalance && initialBalance > 0) {
-        await this.bankAccountRepository.updateBalance(
+        return this.bankAccountRepository.updateBalance(
           account.id,
           initialBalance,
           trx,

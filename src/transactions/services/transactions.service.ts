@@ -31,11 +31,11 @@ export class TransactionsService {
       now.getMonth() + 1,
     );
 
-    if (count >= FREE_PLAN_TRANSACTION_LIMIT) {
+    /* if (count >= FREE_PLAN_TRANSACTION_LIMIT) {
       throw new ForbiddenException(
         'Limite de transações do plano atingido. Faça upgrade para continuar.',
       );
-    }
+    } */
 
     const account = await this.bankAccountRepository.findById(
       dto.bankAccountId,

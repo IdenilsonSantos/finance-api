@@ -30,8 +30,8 @@ export class CreateScheduledTransactionDto {
   @IsString()
   category: string;
 
-  @IsIn(['daily', 'weekly', 'monthly', 'yearly'], {
-    message: 'frequency must be one of the following values: daily, weekly, monthly, yearly',
+  @IsIn(['once', 'daily', 'weekly', 'monthly', 'yearly'], {
+    message: 'frequency must be one of the following values: once, daily, weekly, monthly, yearly',
   })
   frequency: ScheduledTransactionFrequency;
 
@@ -62,7 +62,7 @@ export class UpdateScheduledTransactionDto {
   category?: string;
 
   @IsOptional()
-  @IsIn(['daily', 'weekly', 'monthly', 'yearly'])
+  @IsIn(['once', 'daily', 'weekly', 'monthly', 'yearly'])
   frequency?: ScheduledTransactionFrequency;
 
   @IsOptional()

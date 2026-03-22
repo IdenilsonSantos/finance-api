@@ -10,7 +10,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ScheduledTransactionsService } from '../services/scheduled-transactions.service';
 import {
   CreateScheduledTransactionDto,
@@ -67,10 +69,16 @@ export class ScheduledTransactionsController {
   }
 
   @Post(':id/execute')
-  execute(
+  async execute(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
   ) {
-    return this.scheduledTransactionsService.execute(id, workspaceId);
+    const result = await this.scheduledTransactionsService.execute(id, workspaceId);
+    if (result === null) {
+      res.status(HttpStatus.NO_CONTENT).send();
+    } else {
+      res.status(HttpStatus.OK).json(result);
+    }
   }
 }

@@ -11,6 +11,7 @@ export class TransactionEntity {
   category: string;
   paymentMethod: string | null;
   date: string; // ISO date string: YYYY-MM-DD
+  externalId: string | null;
   createdAt: Date;
   updatedAt: Date;
 
