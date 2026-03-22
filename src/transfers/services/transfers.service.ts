@@ -7,6 +7,7 @@ import {
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ITransferRepository } from '../../core/repositories/transfer.repository.interface';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
+import { NotificationsService } from '../../notifications/services/notifications.service';
 import { CreateTransferDto } from '../dto/transfer.dto';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
@@ -19,6 +20,7 @@ export class TransfersService {
     @Inject(IBankAccountRepository)
     private readonly bankAccountRepository: IBankAccountRepository,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateTransferDto, workspaceId: string) {
@@ -38,17 +40,38 @@ export class TransfersService {
 
     const amountInCents = Math.round(dto.amount * 100);
 
-    return this.db.transaction(async (trx) => {
-      const transfer = await this.transferRepository.create(
+    const transfer = await this.db.transaction(async (trx) => {
+      const t = await this.transferRepository.create(
         { ...dto, amount: amountInCents, workspaceId },
         trx,
       );
-
       await this.bankAccountRepository.updateBalance(dto.fromAccountId, -amountInCents, trx);
       await this.bankAccountRepository.updateBalance(dto.toAccountId, amountInCents, trx);
-
-      return transfer;
+      return t;
     });
+
+    const amountFmt = (amountInCents / 100).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
+    await this.notificationsService.notifyWorkspace(
+      workspaceId,
+      'transferCreated',
+      {
+        title: `Transferência realizada`,
+        body: `${amountFmt} de ${fromAccount.name} → ${toAccount.name}`,
+      },
+      (email) =>
+        this.notificationsService.sendTransferCreated({
+          to: email,
+          fromAccount: fromAccount.name,
+          toAccount: toAccount.name,
+          amount: amountInCents,
+          date: transfer.date,
+        }),
+    );
+
+    return transfer;
   }
 
   async findAll(workspaceId: string) {

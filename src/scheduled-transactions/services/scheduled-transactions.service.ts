@@ -4,10 +4,13 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { lte, isNull, or } from 'drizzle-orm';
 import { IScheduledTransactionRepository } from '../../core/repositories/scheduled-transaction.repository.interface';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
+import { NotificationsService } from '../../notifications/services/notifications.service';
 import {
   CreateScheduledTransactionDto,
   UpdateScheduledTransactionDto,
@@ -26,6 +29,7 @@ export class ScheduledTransactionsService {
     @Inject(ITransactionRepository)
     private readonly transactionRepository: ITransactionRepository,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateScheduledTransactionDto, workspaceId: string) {
@@ -90,7 +94,7 @@ export class ScheduledTransactionsService {
 
     const nextDate = this.calculateNextDate(scheduled.frequency, scheduled.nextDate);
 
-    return this.db.transaction(async (trx) => {
+    const result = await this.db.transaction(async (trx) => {
       await this.transactionRepository.create(
         {
           workspaceId,
@@ -119,6 +123,31 @@ export class ScheduledTransactionsService {
         trx,
       );
     });
+
+    const desc = scheduled.description ?? scheduled.category;
+    const signal = scheduled.type === 'income' ? '+' : '-';
+    const amount = (scheduled.amount / 100).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
+    await this.notificationsService.notifyWorkspace(
+      workspaceId,
+      'scheduledReminder',
+      {
+        title: `Transação agendada executada`,
+        body: `${desc}: ${signal}${amount}`,
+      },
+      (email) =>
+        this.notificationsService.sendScheduledTransactionExecuted({
+          to: email,
+          description: desc,
+          amount: scheduled.amount,
+          type: scheduled.type,
+          date: scheduled.nextDate,
+        }),
+    );
+
+    return result;
   }
 
   private calculateNextDate(
@@ -141,5 +170,77 @@ export class ScheduledTransactionsService {
         break;
     }
     return date.toISOString().slice(0, 10);
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async handleDueTransactions(): Promise<void> {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const due = await this.db
+      .select()
+      .from(schema.scheduledTransaction)
+      .where(
+        lte(schema.scheduledTransaction.nextDate, today),
+      );
+
+    for (const scheduled of due) {
+      if (scheduled.endDate && scheduled.nextDate > scheduled.endDate) continue;
+
+      const account = await this.bankAccountRepository.findById(
+        scheduled.bankAccountId,
+        scheduled.workspaceId,
+      );
+      if (!account) continue;
+
+      const nextDate = this.calculateNextDate(scheduled.frequency, scheduled.nextDate);
+
+      await this.db.transaction(async (trx) => {
+        await this.transactionRepository.create(
+          {
+            workspaceId: scheduled.workspaceId,
+            bankAccountId: scheduled.bankAccountId,
+            amount: scheduled.amount,
+            type: scheduled.type,
+            description: scheduled.description,
+            category: scheduled.category,
+            date: scheduled.nextDate,
+          },
+          trx,
+        );
+
+        const delta = scheduled.type === 'income' ? scheduled.amount : -scheduled.amount;
+        await this.bankAccountRepository.updateBalance(scheduled.bankAccountId, delta, trx);
+        await this.scheduledTransactionRepository.update(
+          scheduled.id,
+          scheduled.workspaceId,
+          { nextDate },
+          trx,
+        );
+      });
+
+      const desc = scheduled.description ?? scheduled.category;
+      const signal = scheduled.type === 'income' ? '+' : '-';
+      const amountFmt = (scheduled.amount / 100).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      });
+
+      await this.notificationsService.notifyWorkspace(
+        scheduled.workspaceId,
+        'scheduledReminder',
+        {
+          title: `Transação agendada executada`,
+          body: `${desc}: ${signal}${amountFmt}`,
+        },
+        (email) =>
+          this.notificationsService.sendScheduledTransactionExecuted({
+            to: email,
+            description: desc,
+            amount: scheduled.amount,
+            type: scheduled.type,
+            date: scheduled.nextDate,
+          }),
+      );
+    }
   }
 }

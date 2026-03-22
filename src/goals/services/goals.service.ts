@@ -1,6 +1,5 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { IGoalRepository } from '../../core/repositories/goal.repository.interface';
-import { IWorkspaceRepository } from '../../core/repositories/workspace.repository.interface';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { CreateGoalDto, UpdateGoalDto, ContributeGoalDto } from '../dto/goal.dto';
 
@@ -9,8 +8,6 @@ export class GoalsService {
   constructor(
     @Inject(IGoalRepository)
     private readonly goalRepository: IGoalRepository,
-    @Inject(IWorkspaceRepository)
-    private readonly workspaceRepository: IWorkspaceRepository,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -59,16 +56,24 @@ export class GoalsService {
     });
 
     if (updated.currentAmount >= updated.targetAmount) {
-      const ownerEmail = await this.workspaceRepository.findOwnerEmail(workspaceId);
-      if (ownerEmail) {
-        await this.notificationsService
-          .sendGoalCompleted({
-            to: ownerEmail,
+      const amount = (updated.targetAmount / 100).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      });
+      await this.notificationsService.notifyWorkspace(
+        workspaceId,
+        'goalAchieved',
+        {
+          title: `Meta "${updated.name}" atingida! 🎉`,
+          body: `Parabéns! Você alcançou ${amount}.`,
+        },
+        (email) =>
+          this.notificationsService.sendGoalCompleted({
+            to: email,
             goalName: updated.name,
             targetAmount: updated.targetAmount,
-          })
-          .catch(() => {});
-      }
+          }),
+      );
     }
 
     return updated;

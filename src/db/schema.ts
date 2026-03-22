@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, date, uniqueIndex, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, date, uniqueIndex, boolean, jsonb } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -137,6 +137,29 @@ export const goal = pgTable('goal', {
   currentAmount: integer('currentAmount').notNull().default(0), // cents
   deadline: date('deadline'),
   color: text('color').notNull().default('#6366f1'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});
+
+export const notification = pgTable('notification', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  read: boolean('read').notNull().default(false),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+});
+
+export const notificationPrefs = pgTable('notificationPrefs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('userId')
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  prefs: jsonb('prefs').notNull().default({}),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
