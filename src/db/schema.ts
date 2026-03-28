@@ -26,6 +26,7 @@ export const workspace = pgTable('workspace', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
+  image: text('image'),
   ownerId: uuid('ownerId')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
@@ -181,6 +182,24 @@ export const transfer = pgTable('transfer', {
   date: date('date').notNull(),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});
+
+export const workspaceInvite = pgTable('workspaceInvite', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  invitedEmail: text('invitedEmail').notNull(),
+  role: text('role', { enum: ['admin', 'member'] })
+    .notNull()
+    .default('member'),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expiresAt').notNull(),
+  acceptedAt: timestamp('acceptedAt'),
+  createdBy: uuid('createdBy')
+    .notNull()
+    .references(() => user.id),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
 });
 
 export const categoryRule = pgTable(

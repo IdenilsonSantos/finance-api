@@ -2,6 +2,7 @@ export class WorkspaceEntity {
   id: string;
   name: string;
   slug: string;
+  image: string | null;
   ownerId: string;
   createdAt: Date;
   updatedAt: Date;

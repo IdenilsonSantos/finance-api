@@ -1,9 +1,14 @@
 import { WorkspaceEntity } from '../entities/workspace.entity';
 
+export interface WorkspaceWithRole {
+  workspace: WorkspaceEntity;
+  role: 'owner' | 'admin' | 'member';
+}
+
 export interface IWorkspaceRepository {
   findById(id: string): Promise<WorkspaceEntity | null>;
   findBySlug(slug: string): Promise<WorkspaceEntity | null>;
-  findByUserId(userId: string): Promise<WorkspaceEntity[]>;
+  findByUserId(userId: string): Promise<WorkspaceWithRole[]>;
   create(
     workspace: Partial<WorkspaceEntity>,
     trx?: any,

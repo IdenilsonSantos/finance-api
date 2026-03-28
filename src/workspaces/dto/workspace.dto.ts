@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, IsIn, IsUrl } from 'class-validator';
 
 export class CreateWorkspaceDto {
   @IsString()
@@ -15,4 +15,22 @@ export class UpdateWorkspaceDto {
   @IsNotEmpty()
   @IsOptional()
   name?: string;
+
+  @IsUrl()
+  @IsOptional()
+  image?: string;
+}
+
+export class InviteMemberDto {
+  @IsEmail()
+  email: string;
+
+  @IsOptional()
+  @IsIn(['admin', 'member'])
+  role?: 'admin' | 'member' = 'member';
+}
+
+export class UpdateMemberRoleDto {
+  @IsIn(['admin', 'member'])
+  role: 'admin' | 'member';
 }

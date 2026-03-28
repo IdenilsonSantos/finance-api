@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EmailService } from './services/email.service';
 import { NotificationsService } from './services/notifications.service';
 import { NotificationsController } from './controllers/notifications.controller';
 import { NotificationsGateway } from './gateways/notifications.gateway';
@@ -15,7 +16,7 @@ import { NotificationsGateway } from './gateways/notifications.gateway';
       inject: [ConfigService],
     }),
   ],
-  providers: [NotificationsService, NotificationsGateway],
+  providers: [EmailService, NotificationsService, NotificationsGateway],
   controllers: [NotificationsController],
   exports: [NotificationsService],
 })
