@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, lte, gte } from 'drizzle-orm';
+import { eq, and, lte, gte, isNull, or } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { ScheduledTransactionEntity } from '../../../../core/entities/scheduled-transaction.entity';
@@ -43,9 +43,18 @@ export class DrizzleScheduledTransactionRepository
   }
 
   async findDue(upToDate: string): Promise<ScheduledTransactionEntity[]> {
-    const results = await this.db.query.scheduledTransaction.findMany({
-      where: lte(schema.scheduledTransaction.nextDate, upToDate),
-    });
+    const results = await this.db
+      .select()
+      .from(schema.scheduledTransaction)
+      .where(
+        and(
+          lte(schema.scheduledTransaction.nextDate, upToDate),
+          or(
+            isNull(schema.scheduledTransaction.endDate),
+            gte(schema.scheduledTransaction.endDate, upToDate),
+          ),
+        ),
+      );
     return results.map((r) => new ScheduledTransactionEntity(r));
   }
 

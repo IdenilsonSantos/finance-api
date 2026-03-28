@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { BankAccountsModule } from '../bank-accounts/bank-accounts.module';
 import { TransactionsModule } from '../transactions/transactions.module';
-import { ScheduleModule } from '@nestjs/schedule';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ScheduledTransactionsService } from './services/scheduled-transactions.service';
 import { ScheduledTransactionsController } from './controllers/scheduled-transactions.controller';
@@ -11,7 +10,7 @@ import { IScheduledTransactionRepository } from '../core/repositories/scheduled-
 import { DrizzleScheduledTransactionRepository } from '../infrastructure/database/drizzle/repositories/drizzle-scheduled-transaction.repository';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), WorkspacesModule, BankAccountsModule, TransactionsModule, NotificationsModule],
+  imports: [WorkspacesModule, BankAccountsModule, TransactionsModule, NotificationsModule],
   providers: [
     ScheduledTransactionsService,
     WorkspaceGuard,
