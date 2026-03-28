@@ -5,13 +5,14 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseUUIDPipe,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { TransfersService } from '../services/transfers.service';
-import { CreateTransferDto } from '../dto/transfer.dto';
+import { CreateTransferDto, ListTransfersDto } from '../dto/transfer.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
@@ -27,8 +28,8 @@ export class TransfersController {
   }
 
   @Get()
-  findAll(@WorkspaceId() workspaceId: string) {
-    return this.transfersService.findAll(workspaceId);
+  findAll(@WorkspaceId() workspaceId: string, @Query() query: ListTransfersDto) {
+    return this.transfersService.findAll(workspaceId, query);
   }
 
   @Get(':id')

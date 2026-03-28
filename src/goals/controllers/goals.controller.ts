@@ -6,13 +6,14 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseUUIDPipe,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { GoalsService } from '../services/goals.service';
-import { CreateGoalDto, UpdateGoalDto, ContributeGoalDto } from '../dto/goal.dto';
+import { CreateGoalDto, UpdateGoalDto, ContributeGoalDto, ListGoalsDto } from '../dto/goal.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
@@ -28,8 +29,8 @@ export class GoalsController {
   }
 
   @Get()
-  findAll(@WorkspaceId() workspaceId: string) {
-    return this.goalsService.findAll(workspaceId);
+  findAll(@WorkspaceId() workspaceId: string, @Query() query: ListGoalsDto) {
+    return this.goalsService.findAll(workspaceId, query);
   }
 
   @Get(':id')

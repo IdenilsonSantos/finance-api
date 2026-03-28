@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseUUIDPipe,
   UseGuards,
   HttpCode,
@@ -17,6 +18,7 @@ import { ScheduledTransactionsService } from '../services/scheduled-transactions
 import {
   CreateScheduledTransactionDto,
   UpdateScheduledTransactionDto,
+  ListScheduledTransactionsDto,
 } from '../dto/scheduled-transaction.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
@@ -38,8 +40,8 @@ export class ScheduledTransactionsController {
   }
 
   @Get()
-  findAll(@WorkspaceId() workspaceId: string) {
-    return this.scheduledTransactionsService.findAll(workspaceId);
+  findAll(@WorkspaceId() workspaceId: string, @Query() query: ListScheduledTransactionsDto) {
+    return this.scheduledTransactionsService.findAll(workspaceId, query);
   }
 
   @Get(':id')

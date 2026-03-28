@@ -8,7 +8,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ITransferRepository } from '../../core/repositories/transfer.repository.interface';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { CreateTransferDto } from '../dto/transfer.dto';
+import { CreateTransferDto, ListTransfersDto } from '../dto/transfer.dto';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 
@@ -74,8 +74,14 @@ export class TransfersService {
     return transfer;
   }
 
-  async findAll(workspaceId: string) {
-    return this.transferRepository.findAllByWorkspace(workspaceId);
+  async findAll(workspaceId: string, filters: ListTransfersDto) {
+    return this.transferRepository.findAllByWorkspace(workspaceId, {
+      page: filters.page ?? 1,
+      limit: filters.limit ?? 20,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      accountId: filters.accountId,
+    });
   }
 
   async findOne(id: string, workspaceId: string) {

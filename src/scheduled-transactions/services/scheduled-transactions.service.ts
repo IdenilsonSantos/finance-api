@@ -14,6 +14,7 @@ import { NotificationsService } from '../../notifications/services/notifications
 import {
   CreateScheduledTransactionDto,
   UpdateScheduledTransactionDto,
+  ListScheduledTransactionsDto,
 } from '../dto/scheduled-transaction.dto';
 import type { ScheduledTransactionFrequency } from '../../core/entities/scheduled-transaction.entity';
 import { DRIZZLE } from '../../db/database.module';
@@ -50,8 +51,13 @@ export class ScheduledTransactionsService {
     });
   }
 
-  async findAll(workspaceId: string) {
-    return this.scheduledTransactionRepository.findAllByWorkspace(workspaceId);
+  async findAll(workspaceId: string, filters: ListScheduledTransactionsDto) {
+    return this.scheduledTransactionRepository.findAllByWorkspace(workspaceId, {
+      page: filters.page ?? 1,
+      limit: filters.limit ?? 20,
+      frequency: filters.frequency,
+      accountId: filters.accountId,
+    });
   }
 
   async findOne(id: string, workspaceId: string) {

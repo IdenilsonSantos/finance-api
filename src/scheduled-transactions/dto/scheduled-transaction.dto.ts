@@ -9,6 +9,17 @@ import {
 } from 'class-validator';
 import type { TransactionType } from '../../core/entities/transaction.entity';
 import type { ScheduledTransactionFrequency } from '../../core/entities/scheduled-transaction.entity';
+import { PaginationDto } from '../../core/dto/pagination.dto';
+
+export class ListScheduledTransactionsDto extends PaginationDto {
+  @IsOptional()
+  @IsIn(['once', 'daily', 'weekly', 'monthly', 'yearly'])
+  frequency?: ScheduledTransactionFrequency;
+
+  @IsOptional()
+  @IsUUID()
+  accountId?: string;
+}
 
 export class CreateScheduledTransactionDto {
   @IsUUID()

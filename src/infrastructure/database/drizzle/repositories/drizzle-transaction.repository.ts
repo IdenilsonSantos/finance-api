@@ -1,10 +1,12 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte, count, inArray, isNotNull } from 'drizzle-orm';
+import { eq, and, gte, lte, count, inArray, isNotNull, ilike, or, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { TransactionEntity } from '../../../../core/entities/transaction.entity';
-import { ITransactionRepository } from '../../../../core/repositories/transaction.repository.interface';
+import { ITransactionRepository, ListTransactionsFilters } from '../../../../core/repositories/transaction.repository.interface';
+import { PaginatedResult } from '../../../../core/dto/pagination.dto';
+import { paginate } from '../helpers/paginate.helper';
 
 @Injectable()
 export class DrizzleTransactionRepository implements ITransactionRepository {
@@ -22,12 +24,53 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
     return result ? new TransactionEntity(result) : null;
   }
 
-  async findAllByWorkspace(workspaceId: string): Promise<TransactionEntity[]> {
-    const results = await this.db.query.transaction.findMany({
-      where: eq(schema.transaction.workspaceId, workspaceId),
-      orderBy: (t, { desc }) => [desc(t.date), desc(t.createdAt)],
-    });
-    return results.map((r) => new TransactionEntity(r));
+  async findAllByWorkspace(
+    workspaceId: string,
+    filters: ListTransactionsFilters,
+  ): Promise<PaginatedResult<TransactionEntity>> {
+    const { page, limit, type, category, accountId, startDate, endDate, search } = filters;
+    const { limit: lim, offset } = paginate(page, limit);
+
+    const conditions: SQL[] = [eq(schema.transaction.workspaceId, workspaceId)];
+
+    if (type) conditions.push(eq(schema.transaction.type, type));
+    if (category) conditions.push(eq(schema.transaction.category, category));
+    if (accountId) conditions.push(eq(schema.transaction.bankAccountId, accountId));
+    if (startDate) conditions.push(gte(schema.transaction.date, startDate));
+    if (endDate) conditions.push(lte(schema.transaction.date, endDate));
+    if (search) {
+      conditions.push(
+        or(
+          ilike(schema.transaction.description, `%${search}%`),
+          ilike(schema.transaction.beneficiary, `%${search}%`),
+        ) as SQL,
+      );
+    }
+
+    const where = and(...conditions);
+
+    const [{ total }] = await this.db
+      .select({ total: count() })
+      .from(schema.transaction)
+      .where(where);
+
+    const rows = await this.db
+      .select()
+      .from(schema.transaction)
+      .where(where)
+      .orderBy(schema.transaction.date, schema.transaction.createdAt)
+      .limit(lim)
+      .offset(offset);
+
+    const totalNum = Number(total);
+
+    return {
+      data: rows.map((r) => new TransactionEntity(r)),
+      total: totalNum,
+      page,
+      limit,
+      totalPages: Math.ceil(totalNum / limit),
+    };
   }
 
   async create(data: Partial<TransactionEntity>, trx?: any): Promise<TransactionEntity> {

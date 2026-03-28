@@ -1,10 +1,12 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, lte, gte, isNull, or } from 'drizzle-orm';
+import { eq, and, lte, gte, isNull, or, count, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { ScheduledTransactionEntity } from '../../../../core/entities/scheduled-transaction.entity';
-import { IScheduledTransactionRepository } from '../../../../core/repositories/scheduled-transaction.repository.interface';
+import { IScheduledTransactionRepository, ListScheduledTransactionsFilters } from '../../../../core/repositories/scheduled-transaction.repository.interface';
+import { PaginatedResult } from '../../../../core/dto/pagination.dto';
+import { paginate } from '../helpers/paginate.helper';
 
 @Injectable()
 export class DrizzleScheduledTransactionRepository
@@ -27,19 +29,46 @@ export class DrizzleScheduledTransactionRepository
     return result ? new ScheduledTransactionEntity(result) : null;
   }
 
-  async findAllByWorkspace(workspaceId: string): Promise<ScheduledTransactionEntity[]> {
+  async findAllByWorkspace(
+    workspaceId: string,
+    filters: ListScheduledTransactionsFilters,
+  ): Promise<PaginatedResult<ScheduledTransactionEntity>> {
+    const { page, limit, frequency, accountId } = filters;
+    const { limit: lim, offset } = paginate(page, limit);
     const today = new Date().toISOString().slice(0, 10);
-    const results = await this.db
+
+    const conditions: SQL[] = [
+      eq(schema.scheduledTransaction.workspaceId, workspaceId),
+      gte(schema.scheduledTransaction.nextDate, today),
+    ];
+
+    if (frequency) conditions.push(eq(schema.scheduledTransaction.frequency, frequency));
+    if (accountId) conditions.push(eq(schema.scheduledTransaction.bankAccountId, accountId));
+
+    const where = and(...conditions);
+
+    const [{ total }] = await this.db
+      .select({ total: count() })
+      .from(schema.scheduledTransaction)
+      .where(where);
+
+    const rows = await this.db
       .select()
       .from(schema.scheduledTransaction)
-      .where(
-        and(
-          eq(schema.scheduledTransaction.workspaceId, workspaceId),
-          gte(schema.scheduledTransaction.nextDate, today),
-        ),
-      )
-      .orderBy(schema.scheduledTransaction.nextDate);
-    return results.map((r) => new ScheduledTransactionEntity(r));
+      .where(where)
+      .orderBy(schema.scheduledTransaction.nextDate)
+      .limit(lim)
+      .offset(offset);
+
+    const totalNum = Number(total);
+
+    return {
+      data: rows.map((r) => new ScheduledTransactionEntity(r)),
+      total: totalNum,
+      page,
+      limit,
+      totalPages: Math.ceil(totalNum / limit),
+    };
   }
 
   async findDue(upToDate: string): Promise<ScheduledTransactionEntity[]> {

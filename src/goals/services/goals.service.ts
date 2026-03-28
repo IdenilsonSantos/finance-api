@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { IGoalRepository } from '../../core/repositories/goal.repository.interface';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { CreateGoalDto, UpdateGoalDto, ContributeGoalDto } from '../dto/goal.dto';
+import { CreateGoalDto, UpdateGoalDto, ContributeGoalDto, ListGoalsDto } from '../dto/goal.dto';
 
 @Injectable()
 export class GoalsService {
@@ -20,8 +20,12 @@ export class GoalsService {
     });
   }
 
-  async findAll(workspaceId: string) {
-    return this.goalRepository.findAllByWorkspace(workspaceId);
+  async findAll(workspaceId: string, filters: ListGoalsDto) {
+    return this.goalRepository.findAllByWorkspace(workspaceId, {
+      page: filters.page ?? 1,
+      limit: filters.limit ?? 20,
+      completed: filters.completed,
+    });
   }
 
   async findOne(id: string, workspaceId: string) {

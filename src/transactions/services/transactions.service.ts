@@ -7,7 +7,7 @@ import {
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
-import { CreateTransactionDto, UpdateTransactionDto } from '../dto/transaction.dto';
+import { CreateTransactionDto, UpdateTransactionDto, ListTransactionsDto } from '../dto/transaction.dto';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 
@@ -58,8 +58,17 @@ export class TransactionsService {
     });
   }
 
-  async findAll(workspaceId: string) {
-    return this.transactionRepository.findAllByWorkspace(workspaceId);
+  async findAll(workspaceId: string, filters: ListTransactionsDto) {
+    return this.transactionRepository.findAllByWorkspace(workspaceId, {
+      page: filters.page ?? 1,
+      limit: filters.limit ?? 20,
+      type: filters.type,
+      category: filters.category,
+      accountId: filters.accountId,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      search: filters.search,
+    });
   }
 
   async findOne(id: string, workspaceId: string) {

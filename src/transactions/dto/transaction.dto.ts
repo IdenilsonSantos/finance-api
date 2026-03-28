@@ -1,5 +1,6 @@
 import { IsString, IsIn, IsNumber, IsPositive, IsDateString, IsUUID, IsOptional, ValidateIf } from 'class-validator';
 import type { TransactionType } from '../../core/entities/transaction.entity';
+import { PaginationDto } from '../../core/dto/pagination.dto';
 
 export class CreateTransactionDto {
   @IsUUID()
@@ -31,6 +32,32 @@ export class CreateTransactionDto {
 
   @IsDateString()
   date: string;
+}
+
+export class ListTransactionsDto extends PaginationDto {
+  @IsOptional()
+  @IsIn(['income', 'expense'])
+  type?: TransactionType;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsUUID()
+  accountId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
 
 export class UpdateTransactionDto {

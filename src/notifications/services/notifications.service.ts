@@ -5,7 +5,7 @@ import { Resend } from 'resend';
 import { format, parseISO, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte, lt, desc, count } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, desc, count, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 import {
@@ -49,12 +49,17 @@ export class NotificationsService {
     this.from = config.getOrThrow('EMAIL_FROM');
   }
 
-  async getNotifications(userId: string, page = 1, limit = 20) {
+  async getNotifications(userId: string, page = 1, limit = 20, read?: boolean) {
     const offset = (page - 1) * limit;
+
+    const conditions: SQL[] = [eq(schema.notification.userId, userId)];
+    if (read !== undefined) conditions.push(eq(schema.notification.read, read));
+    const where = and(...conditions);
+
     const items = await this.db
       .select()
       .from(schema.notification)
-      .where(eq(schema.notification.userId, userId))
+      .where(where)
       .orderBy(desc(schema.notification.createdAt))
       .limit(limit)
       .offset(offset);
@@ -62,9 +67,16 @@ export class NotificationsService {
     const [{ total }] = await this.db
       .select({ total: count() })
       .from(schema.notification)
-      .where(eq(schema.notification.userId, userId));
+      .where(where);
 
-    return { items, total: Number(total) };
+    const totalNum = Number(total);
+    return {
+      data: items,
+      total: totalNum,
+      page,
+      limit,
+      totalPages: Math.ceil(totalNum / limit),
+    };
   }
 
   async getUnreadCount(userId: string): Promise<number> {
