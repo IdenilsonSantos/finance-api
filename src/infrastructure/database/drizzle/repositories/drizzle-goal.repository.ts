@@ -1,10 +1,12 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, count, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { GoalEntity } from '../../../../core/entities/goal.entity';
-import { IGoalRepository } from '../../../../core/repositories/goal.repository.interface';
+import { IGoalRepository, ListGoalsFilters } from '../../../../core/repositories/goal.repository.interface';
+import { PaginatedResult } from '../../../../core/dto/pagination.dto';
+import { paginate } from '../helpers/paginate.helper';
 
 @Injectable()
 export class DrizzleGoalRepository implements IGoalRepository {
@@ -19,12 +21,45 @@ export class DrizzleGoalRepository implements IGoalRepository {
     return result ? new GoalEntity(result) : null;
   }
 
-  async findAllByWorkspace(workspaceId: string): Promise<GoalEntity[]> {
-    const results = await this.db.query.goal.findMany({
-      where: eq(schema.goal.workspaceId, workspaceId),
-      orderBy: (goal, { desc }) => [desc(goal.createdAt)],
-    });
-    return results.map((r) => new GoalEntity(r));
+  async findAllByWorkspace(
+    workspaceId: string,
+    filters: ListGoalsFilters,
+  ): Promise<PaginatedResult<GoalEntity>> {
+    const { page, limit, completed } = filters;
+    const { limit: lim, offset } = paginate(page, limit);
+
+    const conditions: SQL[] = [eq(schema.goal.workspaceId, workspaceId)];
+
+    if (completed === true) {
+      conditions.push(sql`${schema.goal.currentAmount} >= ${schema.goal.targetAmount}`);
+    } else if (completed === false) {
+      conditions.push(sql`${schema.goal.currentAmount} < ${schema.goal.targetAmount}`);
+    }
+
+    const where = and(...conditions);
+
+    const [{ total }] = await this.db
+      .select({ total: count() })
+      .from(schema.goal)
+      .where(where);
+
+    const rows = await this.db
+      .select()
+      .from(schema.goal)
+      .where(where)
+      .orderBy(schema.goal.createdAt)
+      .limit(lim)
+      .offset(offset);
+
+    const totalNum = Number(total);
+
+    return {
+      data: rows.map((r) => new GoalEntity(r)),
+      total: totalNum,
+      page,
+      limit,
+      totalPages: Math.ceil(totalNum / limit),
+    };
   }
 
   async findWithDeadlineBetween(from: string, to: string): Promise<GoalEntity[]> {

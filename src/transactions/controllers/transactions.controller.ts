@@ -6,13 +6,14 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseUUIDPipe,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { TransactionsService } from '../services/transactions.service';
-import { CreateTransactionDto, UpdateTransactionDto } from '../dto/transaction.dto';
+import { CreateTransactionDto, UpdateTransactionDto, ListTransactionsDto } from '../dto/transaction.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
@@ -28,8 +29,8 @@ export class TransactionsController {
   }
 
   @Get()
-  findAll(@WorkspaceId() workspaceId: string) {
-    return this.transactionsService.findAll(workspaceId);
+  findAll(@WorkspaceId() workspaceId: string, @Query() query: ListTransactionsDto) {
+    return this.transactionsService.findAll(workspaceId, query);
   }
 
   @Get(':id')
