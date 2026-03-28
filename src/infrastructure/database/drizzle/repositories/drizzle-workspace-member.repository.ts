@@ -28,6 +28,13 @@ export class DrizzleWorkspaceMemberRepository implements IWorkspaceMemberReposit
     return result ? new WorkspaceMemberEntity(result) : null;
   }
 
+  async findAllByWorkspace(workspaceId: string): Promise<WorkspaceMemberEntity[]> {
+    const results = await this.db.query.workspaceMember.findMany({
+      where: eq(schema.workspaceMember.workspaceId, workspaceId),
+    });
+    return results.map((r) => new WorkspaceMemberEntity(r));
+  }
+
   async create(
     member: Partial<WorkspaceMemberEntity>,
     trx?: any,

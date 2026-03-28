@@ -8,6 +8,7 @@ export interface IWorkspaceMemberRepository {
     workspaceId: string,
     userId: string,
   ): Promise<WorkspaceMemberEntity | null>;
+  findAllByWorkspace(workspaceId: string): Promise<WorkspaceMemberEntity[]>;
   create(
     member: Partial<WorkspaceMemberEntity>,
     trx?: any,

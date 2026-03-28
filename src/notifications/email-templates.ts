@@ -174,6 +174,20 @@ export function goalDeadlineReminderTemplate(params: {
   `);
 }
 
+export function workspaceInviteTemplate(params: {
+  inviterName: string;
+  workspaceName: string;
+  acceptUrl: string;
+}): string {
+  return layout(`
+    ${badge('#4F46E5', '#EEF2FF', '✉', 'Convite')}
+    ${heading('Você foi convidado!')}
+    ${subtext(`<strong style="color:#111827;">${params.inviterName}</strong> convidou você para colaborar no workspace <strong style="color:#111827;">${params.workspaceName}</strong>.`)}
+    ${ctaButton('Aceitar convite', params.acceptUrl)}
+    <p style="margin:20px 0 0;font-size:12px;color:#9CA3AF;text-align:center;">Link válido por 7 dias.</p>
+  `);
+}
+
 export function budgetAlertTemplate(params: {
   category: string;
   percent: number;

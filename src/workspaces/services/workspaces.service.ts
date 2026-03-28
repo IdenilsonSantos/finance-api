@@ -41,7 +41,13 @@ export class WorkspacesService {
   }
 
   async findByUserId(userId: string) {
-    return this.workspaceRepository.findByUserId(userId);
+    const results = await this.workspaceRepository.findByUserId(userId);
+    return results.map(({ workspace, role }) => ({
+      id: workspace.id,
+      name: workspace.name,
+      slug: workspace.slug,
+      role,
+    }));
   }
 
   async update(id: string, dto: UpdateWorkspaceDto) {

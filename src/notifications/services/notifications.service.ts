@@ -1,7 +1,6 @@
 import { Injectable, Inject, forwardRef } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Resend } from 'resend';
+import { EmailService } from './email.service';
 import { format, parseISO, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -20,6 +19,7 @@ import {
   goalCompletedTemplate,
   goalDeadlineReminderTemplate,
   budgetAlertTemplate,
+  workspaceInviteTemplate,
 } from '../email-templates';
 
 function formatDate(isoDate: string): string {
@@ -36,18 +36,12 @@ function formatBRL(cents: number): string {
 
 @Injectable()
 export class NotificationsService {
-  private readonly resend: Resend;
-  private readonly from: string;
-
   constructor(
-    config: ConfigService,
+    private readonly emailService: EmailService,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     @Inject(forwardRef(() => NotificationsGateway))
     private readonly gateway: NotificationsGateway,
-  ) {
-    this.resend = new Resend(config.getOrThrow('RESEND_API_KEY'));
-    this.from = config.getOrThrow('EMAIL_FROM');
-  }
+  ) {}
 
   async getNotifications(userId: string, page = 1, limit = 20, read?: boolean) {
     const offset = (page - 1) * limit;
@@ -289,8 +283,7 @@ export class NotificationsService {
   }) {
     const amount = formatBRL(params.amount);
     const date = formatDate(params.date);
-    await this.resend.emails.send({
-      from: this.from,
+    await this.emailService.send({
       to: params.to,
       subject: `Transação agendada executada: ${params.description}`,
       html: scheduledTransactionExecutedTemplate({
@@ -311,8 +304,7 @@ export class NotificationsService {
   }) {
     const amount = formatBRL(params.amount);
     const date = formatDate(params.date);
-    await this.resend.emails.send({
-      from: this.from,
+    await this.emailService.send({
       to: params.to,
       subject: `Transferência realizada: ${amount}`,
       html: transferCreatedTemplate({
@@ -330,8 +322,7 @@ export class NotificationsService {
     targetAmount: number;
   }) {
     const amount = formatBRL(params.targetAmount);
-    await this.resend.emails.send({
-      from: this.from,
+    await this.emailService.send({
       to: params.to,
       subject: `Meta atingida: ${params.goalName}`,
       html: goalCompletedTemplate({
@@ -353,8 +344,7 @@ export class NotificationsService {
     const budget = formatBRL(params.budgetAmount);
     const month = formatMonth(params.month);
     const isExceeded = params.percent >= 100;
-    await this.resend.emails.send({
-      from: this.from,
+    await this.emailService.send({
       to: params.to,
       subject: isExceeded
         ? `Orçamento esgotado: ${params.category} em ${month}`
@@ -365,6 +355,23 @@ export class NotificationsService {
         spentAmount: spent,
         budgetAmount: budget,
         month,
+      }),
+    });
+  }
+
+  async sendWorkspaceInvite(params: {
+    to: string;
+    inviterName: string;
+    workspaceName: string;
+    acceptUrl: string;
+  }) {
+    await this.emailService.send({
+      to: params.to,
+      subject: `${params.inviterName} convidou você para o workspace ${params.workspaceName}`,
+      html: workspaceInviteTemplate({
+        inviterName: params.inviterName,
+        workspaceName: params.workspaceName,
+        acceptUrl: params.acceptUrl,
       }),
     });
   }
@@ -380,8 +387,7 @@ export class NotificationsService {
     const target = formatBRL(params.targetAmount);
     const current = formatBRL(params.currentAmount);
     const deadline = formatDate(params.deadline);
-    await this.resend.emails.send({
-      from: this.from,
+    await this.emailService.send({
       to: params.to,
       subject: `Lembrete de meta: ${params.goalName} vence em ${deadline}`,
       html: goalDeadlineReminderTemplate({

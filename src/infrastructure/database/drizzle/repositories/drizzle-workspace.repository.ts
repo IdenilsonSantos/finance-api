@@ -4,7 +4,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { WorkspaceEntity } from '../../../../core/entities/workspace.entity';
-import { IWorkspaceRepository } from '../../../../core/repositories/workspace.repository.interface';
+import { IWorkspaceRepository, WorkspaceWithRole } from '../../../../core/repositories/workspace.repository.interface';
 
 @Injectable()
 export class DrizzleWorkspaceRepository implements IWorkspaceRepository {
@@ -26,21 +26,20 @@ export class DrizzleWorkspaceRepository implements IWorkspaceRepository {
     return result ? new WorkspaceEntity(result) : null;
   }
 
-  async findByUserId(userId: string): Promise<WorkspaceEntity[]> {
-    const members = await this.db
-      .select({ workspaceId: schema.workspaceMember.workspaceId })
+  async findByUserId(userId: string): Promise<WorkspaceWithRole[]> {
+    const rows = await this.db
+      .select({
+        workspace: schema.workspace,
+        role: schema.workspaceMember.role,
+      })
       .from(schema.workspaceMember)
+      .innerJoin(schema.workspace, eq(schema.workspaceMember.workspaceId, schema.workspace.id))
       .where(eq(schema.workspaceMember.userId, userId));
 
-    if (members.length === 0) return [];
-
-    const ids = members.map((m) => m.workspaceId);
-    const workspaces = await this.db
-      .select()
-      .from(schema.workspace)
-      .where(inArray(schema.workspace.id, ids));
-
-    return workspaces.map((w) => new WorkspaceEntity(w));
+    return rows.map((r) => ({
+      workspace: new WorkspaceEntity(r.workspace),
+      role: r.role as 'owner' | 'admin' | 'member',
+    }));
   }
 
   async create(
