@@ -206,9 +206,6 @@ export class NotificationsService {
 
     if (!owner) return;
 
-    const prefs = await this.getPrefs(ws.ownerId);
-    if (!prefs[pref]) return;
-
     await this.createNotification(
       ws.ownerId,
       pref,
@@ -216,9 +213,12 @@ export class NotificationsService {
       notification.body,
     ).catch(() => {});
 
-    await emailSend(owner.email).catch((err: unknown) => {
-      console.error('[NotificationsService] Failed to send email:', err);
-    });
+    const prefs = await this.getPrefs(ws.ownerId);
+    if (prefs[pref]) {
+      await emailSend(owner.email).catch((err: unknown) => {
+        console.error('[NotificationsService] Failed to send email:', err);
+      });
+    }
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM)

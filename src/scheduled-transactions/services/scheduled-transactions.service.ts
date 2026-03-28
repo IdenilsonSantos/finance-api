@@ -1,12 +1,12 @@
 import {
   Injectable,
   Inject,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { lte, isNull, or } from 'drizzle-orm';
 import { IScheduledTransactionRepository } from '../../core/repositories/scheduled-transaction.repository.interface';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
@@ -21,6 +21,8 @@ import * as schema from '../../db/schema';
 
 @Injectable()
 export class ScheduledTransactionsService {
+  private readonly logger = new Logger(ScheduledTransactionsService.name);
+
   constructor(
     @Inject(IScheduledTransactionRepository)
     private readonly scheduledTransactionRepository: IScheduledTransactionRepository,
@@ -182,83 +184,91 @@ export class ScheduledTransactionsService {
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleDueTransactions(): Promise<void> {
     const today = new Date().toISOString().slice(0, 10);
+    const due = await this.scheduledTransactionRepository.findDue(today);
 
-    const due = await this.db
-      .select()
-      .from(schema.scheduledTransaction)
-      .where(
-        lte(schema.scheduledTransaction.nextDate, today),
-      );
+    this.logger.log(`Cron: ${due.length} transação(ões) agendada(s) a executar para ${today}`);
 
     for (const scheduled of due) {
-      if (scheduled.endDate && scheduled.nextDate > scheduled.endDate) continue;
-
-      const account = await this.bankAccountRepository.findById(
-        scheduled.bankAccountId,
-        scheduled.workspaceId,
-      );
-      if (!account) continue;
-
-      const nextDate = scheduled.frequency !== 'once'
-        ? this.calculateNextDate(scheduled.frequency, scheduled.nextDate)
-        : null;
-
-      await this.db.transaction(async (trx) => {
-        await this.transactionRepository.create(
-          {
-            workspaceId: scheduled.workspaceId,
-            bankAccountId: scheduled.bankAccountId,
-            amount: scheduled.amount,
-            type: scheduled.type,
-            description: scheduled.description,
-            category: scheduled.category,
-            date: scheduled.nextDate,
-          },
-          trx,
+      try {
+        const account = await this.bankAccountRepository.findById(
+          scheduled.bankAccountId,
+          scheduled.workspaceId,
         );
-
-        const delta = scheduled.type === 'income' ? scheduled.amount : -scheduled.amount;
-        await this.bankAccountRepository.updateBalance(scheduled.bankAccountId, delta, trx);
-
-        if (scheduled.frequency === 'once') {
-          await this.scheduledTransactionRepository.delete(
-            scheduled.id,
-            scheduled.workspaceId,
-            trx,
-          );
-        } else {
-          await this.scheduledTransactionRepository.update(
-            scheduled.id,
-            scheduled.workspaceId,
-            { nextDate: nextDate as string },
-            trx,
-          );
+        if (!account) {
+          this.logger.warn(`Conta ${scheduled.bankAccountId} não encontrada para scheduled ${scheduled.id} — pulando`);
+          continue;
         }
-      });
 
-      const desc = scheduled.description ?? scheduled.category;
-      const signal = scheduled.type === 'income' ? '+' : '-';
-      const amountFmt = (scheduled.amount / 100).toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      });
+        const nextDate = scheduled.frequency !== 'once'
+          ? this.calculateNextDate(scheduled.frequency, scheduled.nextDate)
+          : null;
 
-      await this.notificationsService.notifyWorkspace(
-        scheduled.workspaceId,
-        'scheduledReminder',
-        {
-          title: `Transação agendada executada`,
-          body: `${desc}: ${signal}${amountFmt}`,
-        },
-        (email) =>
-          this.notificationsService.sendScheduledTransactionExecuted({
-            to: email,
-            description: desc,
-            amount: scheduled.amount,
-            type: scheduled.type,
-            date: scheduled.nextDate,
-          }),
-      );
+        await this.db.transaction(async (trx) => {
+          await this.transactionRepository.create(
+            {
+              workspaceId: scheduled.workspaceId,
+              bankAccountId: scheduled.bankAccountId,
+              amount: scheduled.amount,
+              type: scheduled.type,
+              description: scheduled.description,
+              category: scheduled.category,
+              date: scheduled.nextDate,
+            },
+            trx,
+          );
+
+          const delta = scheduled.type === 'income' ? scheduled.amount : -scheduled.amount;
+          await this.bankAccountRepository.updateBalance(scheduled.bankAccountId, delta, trx);
+
+          if (scheduled.frequency === 'once') {
+            await this.scheduledTransactionRepository.delete(
+              scheduled.id,
+              scheduled.workspaceId,
+              trx,
+            );
+          } else {
+            await this.scheduledTransactionRepository.update(
+              scheduled.id,
+              scheduled.workspaceId,
+              { nextDate: nextDate as string },
+              trx,
+            );
+          }
+        });
+
+        const desc = scheduled.description ?? scheduled.category;
+        const signal = scheduled.type === 'income' ? '+' : '-';
+        const amountFmt = (scheduled.amount / 100).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        });
+
+        this.logger.log(`Executada: scheduled=${scheduled.id} workspace=${scheduled.workspaceId} ${signal}${amountFmt}`);
+
+        await this.notificationsService.notifyWorkspace(
+          scheduled.workspaceId,
+          'scheduledReminder',
+          {
+            title: `Transação agendada executada`,
+            body: `${desc}: ${signal}${amountFmt}`,
+          },
+          (email) =>
+            this.notificationsService.sendScheduledTransactionExecuted({
+              to: email,
+              description: desc,
+              amount: scheduled.amount,
+              type: scheduled.type,
+              date: scheduled.nextDate,
+            }),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Falha ao executar scheduled=${scheduled.id} workspace=${scheduled.workspaceId}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
     }
+
+    this.logger.log(`Cron: concluído para ${today}`);
   }
 }
