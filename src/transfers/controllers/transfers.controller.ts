@@ -24,6 +24,7 @@ import { CreateTransferDto, ListTransfersDto } from '../dto/transfer.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
+import { GetUser } from '../../auth/decorators/get-user.decorator';
 
 @ApiTags('Transfers')
 @ApiBearerAuth('access-token')
@@ -35,8 +36,12 @@ export class TransfersController {
   @Post()
   @ApiOperation({ summary: 'Create a transfer between accounts' })
   @ApiResponse({ status: 201, description: 'Transfer created' })
-  create(@WorkspaceId() workspaceId: string, @Body() dto: CreateTransferDto) {
-    return this.transfersService.create(dto, workspaceId);
+  create(
+    @WorkspaceId() workspaceId: string,
+    @GetUser('userId') userId: string,
+    @Body() dto: CreateTransferDto,
+  ) {
+    return this.transfersService.create(dto, workspaceId, userId);
   }
 
   @Get()
@@ -72,7 +77,8 @@ export class TransfersController {
   remove(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
   ) {
-    return this.transfersService.remove(id, workspaceId);
+    return this.transfersService.remove(id, workspaceId, userId);
   }
 }

@@ -237,3 +237,22 @@ export const adminUser = pgTable('adminUser', {
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
+
+export const workspaceActivity = pgTable(
+  'workspaceActivity',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspaceId')
+      .notNull()
+      .references(() => workspace.id, { onDelete: 'cascade' }),
+    userId: uuid('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    action: text('action').notNull(),
+    entityType: text('entityType').notNull(),
+    entityId: text('entityId').notNull(),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamp('createdAt').defaultNow().notNull(),
+  },
+  (t) => [index('workspaceActivity_workspace_createdAt_idx').on(t.workspaceId, t.createdAt)],
+);

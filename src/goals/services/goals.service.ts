@@ -1,6 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { IGoalRepository } from '../../core/repositories/goal.repository.interface';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { ActivityService } from '../../activity/activity.service';
 import { CreateGoalDto, UpdateGoalDto, ContributeGoalDto, ListGoalsDto } from '../dto/goal.dto';
 
 @Injectable()
@@ -9,15 +10,27 @@ export class GoalsService {
     @Inject(IGoalRepository)
     private readonly goalRepository: IGoalRepository,
     private readonly notificationsService: NotificationsService,
+    private readonly activityService: ActivityService,
   ) {}
 
-  async create(dto: CreateGoalDto, workspaceId: string) {
+  async create(dto: CreateGoalDto, workspaceId: string, userId: string) {
     const targetAmount = Math.round(dto.targetAmount * 100);
-    return this.goalRepository.create({
+    const goal = await this.goalRepository.create({
       ...dto,
       targetAmount,
       workspaceId,
     });
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'goal.created',
+      entityType: 'goal',
+      entityId: goal.id,
+      metadata: { name: goal.name, targetAmount: goal.targetAmount },
+    });
+
+    return goal;
   }
 
   async findAll(workspaceId: string, filters: ListGoalsDto) {
@@ -34,7 +47,7 @@ export class GoalsService {
     return goal;
   }
 
-  async update(id: string, workspaceId: string, dto: UpdateGoalDto) {
+  async update(id: string, workspaceId: string, dto: UpdateGoalDto, userId: string) {
     await this.findOne(id, workspaceId);
 
     const data: Record<string, any> = { ...dto };
@@ -42,12 +55,32 @@ export class GoalsService {
       data.targetAmount = Math.round(dto.targetAmount * 100);
     }
 
-    return this.goalRepository.update(id, workspaceId, data);
+    const updated = await this.goalRepository.update(id, workspaceId, data);
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'goal.updated',
+      entityType: 'goal',
+      entityId: id,
+      metadata: { name: updated.name },
+    });
+
+    return updated;
   }
 
-  async remove(id: string, workspaceId: string) {
-    await this.findOne(id, workspaceId);
+  async remove(id: string, workspaceId: string, userId: string) {
+    const goal = await this.findOne(id, workspaceId);
     await this.goalRepository.delete(id, workspaceId);
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'goal.deleted',
+      entityType: 'goal',
+      entityId: id,
+      metadata: { name: goal.name },
+    });
   }
 
   async contribute(id: string, workspaceId: string, dto: ContributeGoalDto) {

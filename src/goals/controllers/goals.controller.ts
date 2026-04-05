@@ -25,6 +25,7 @@ import { CreateGoalDto, UpdateGoalDto, ContributeGoalDto, ListGoalsDto } from '.
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
+import { GetUser } from '../../auth/decorators/get-user.decorator';
 
 @ApiTags('Goals')
 @ApiBearerAuth('access-token')
@@ -36,8 +37,12 @@ export class GoalsController {
   @Post()
   @ApiOperation({ summary: 'Create a financial goal' })
   @ApiResponse({ status: 201, description: 'Goal created' })
-  create(@WorkspaceId() workspaceId: string, @Body() dto: CreateGoalDto) {
-    return this.goalsService.create(dto, workspaceId);
+  create(
+    @WorkspaceId() workspaceId: string,
+    @GetUser('userId') userId: string,
+    @Body() dto: CreateGoalDto,
+  ) {
+    return this.goalsService.create(dto, workspaceId, userId);
   }
 
   @Get()
@@ -70,9 +75,10 @@ export class GoalsController {
   update(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
     @Body() dto: UpdateGoalDto,
   ) {
-    return this.goalsService.update(id, workspaceId, dto);
+    return this.goalsService.update(id, workspaceId, dto, userId);
   }
 
   @Delete(':id')
@@ -84,8 +90,9 @@ export class GoalsController {
   remove(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
   ) {
-    return this.goalsService.remove(id, workspaceId);
+    return this.goalsService.remove(id, workspaceId, userId);
   }
 
   @Post(':id/contribute')

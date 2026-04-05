@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { IBudgetRepository } from '../../core/repositories/budget.repository.interface';
+import { ActivityService } from '../../activity/activity.service';
 import { CreateBudgetDto, UpdateBudgetDto } from '../dto/budget.dto';
 
 @Injectable()
@@ -12,9 +13,10 @@ export class BudgetsService {
   constructor(
     @Inject(IBudgetRepository)
     private readonly budgetRepository: IBudgetRepository,
+    private readonly activityService: ActivityService,
   ) {}
 
-  async create(dto: CreateBudgetDto, workspaceId: string) {
+  async create(dto: CreateBudgetDto, workspaceId: string, userId: string) {
     const existing = await this.budgetRepository.findAllByWorkspace(
       workspaceId,
       dto.month,
@@ -28,7 +30,18 @@ export class BudgetsService {
     }
 
     const amountInCents = Math.round(dto.amount * 100);
-    return this.budgetRepository.create({ ...dto, amount: amountInCents, workspaceId });
+    const budget = await this.budgetRepository.create({ ...dto, amount: amountInCents, workspaceId });
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'budget.created',
+      entityType: 'budget',
+      entityId: budget.id,
+      metadata: { category: budget.category, amount: budget.amount, month: budget.month },
+    });
+
+    return budget;
   }
 
   async getSummary(workspaceId: string, month: string) {
@@ -45,15 +58,35 @@ export class BudgetsService {
     return budget;
   }
 
-  async update(id: string, workspaceId: string, dto: UpdateBudgetDto) {
-    await this.findOne(id, workspaceId);
+  async update(id: string, workspaceId: string, dto: UpdateBudgetDto, userId: string) {
+    const existing = await this.findOne(id, workspaceId);
     const data: Record<string, any> = {};
     if (dto.amount !== undefined) data.amount = Math.round(dto.amount * 100);
-    return this.budgetRepository.update(id, workspaceId, data);
+    const updated = await this.budgetRepository.update(id, workspaceId, data);
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'budget.updated',
+      entityType: 'budget',
+      entityId: id,
+      metadata: { category: existing.category, amount: updated.amount },
+    });
+
+    return updated;
   }
 
-  async remove(id: string, workspaceId: string) {
-    await this.findOne(id, workspaceId);
+  async remove(id: string, workspaceId: string, userId: string) {
+    const budget = await this.findOne(id, workspaceId);
     await this.budgetRepository.delete(id, workspaceId);
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'budget.deleted',
+      entityType: 'budget',
+      entityId: id,
+      metadata: { category: budget.category },
+    });
   }
 }

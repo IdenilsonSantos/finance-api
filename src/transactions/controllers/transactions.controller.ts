@@ -25,6 +25,7 @@ import { CreateTransactionDto, UpdateTransactionDto, ListTransactionsDto } from 
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
+import { GetUser } from '../../auth/decorators/get-user.decorator';
 
 @ApiTags('Transactions')
 @ApiBearerAuth('access-token')
@@ -36,8 +37,12 @@ export class TransactionsController {
   @Post()
   @ApiOperation({ summary: 'Create a transaction' })
   @ApiResponse({ status: 201, description: 'Transaction created' })
-  create(@WorkspaceId() workspaceId: string, @Body() dto: CreateTransactionDto) {
-    return this.transactionsService.create(dto, workspaceId);
+  create(
+    @WorkspaceId() workspaceId: string,
+    @GetUser('userId') userId: string,
+    @Body() dto: CreateTransactionDto,
+  ) {
+    return this.transactionsService.create(dto, workspaceId, userId);
   }
 
   @Get()
@@ -75,9 +80,10 @@ export class TransactionsController {
   update(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
     @Body() dto: UpdateTransactionDto,
   ) {
-    return this.transactionsService.update(id, workspaceId, dto);
+    return this.transactionsService.update(id, workspaceId, dto, userId);
   }
 
   @Delete(':id')
@@ -89,7 +95,8 @@ export class TransactionsController {
   remove(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
   ) {
-    return this.transactionsService.remove(id, workspaceId);
+    return this.transactionsService.remove(id, workspaceId, userId);
   }
 }

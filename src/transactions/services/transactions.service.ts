@@ -8,6 +8,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
 import { CreateTransactionDto, UpdateTransactionDto, ListTransactionsDto } from '../dto/transaction.dto';
+import { ActivityService } from '../../activity/activity.service';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 
@@ -21,9 +22,10 @@ export class TransactionsService {
     @Inject(IBankAccountRepository)
     private readonly bankAccountRepository: IBankAccountRepository,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
+    private readonly activityService: ActivityService,
   ) {}
 
-  async create(dto: CreateTransactionDto, workspaceId: string) {
+  async create(dto: CreateTransactionDto, workspaceId: string, userId: string) {
     const now = new Date();
     const count = await this.transactionRepository.countByWorkspaceAndMonth(
       workspaceId,
@@ -45,8 +47,8 @@ export class TransactionsService {
 
     const amountInCents = Math.round(dto.amount * 100);
 
-    return this.db.transaction(async (trx) => {
-      const tx = await this.transactionRepository.create(
+    const tx = await this.db.transaction(async (trx) => {
+      const created = await this.transactionRepository.create(
         { ...dto, amount: amountInCents, workspaceId },
         trx,
       );
@@ -54,8 +56,24 @@ export class TransactionsService {
       const delta = dto.type === 'income' ? amountInCents : -amountInCents;
       await this.bankAccountRepository.updateBalance(dto.bankAccountId, delta, trx);
 
-      return tx;
+      return created;
     });
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'transaction.created',
+      entityType: 'transaction',
+      entityId: tx.id,
+      metadata: {
+        description: tx.description,
+        amount: tx.amount,
+        type: tx.type,
+        category: tx.category,
+      },
+    });
+
+    return tx;
   }
 
   async findAll(workspaceId: string, filters: ListTransactionsDto) {
@@ -77,19 +95,17 @@ export class TransactionsService {
     return tx;
   }
 
-  async update(id: string, workspaceId: string, dto: UpdateTransactionDto) {
+  async update(id: string, workspaceId: string, dto: UpdateTransactionDto, userId: string) {
     const old = await this.findOne(id, workspaceId);
 
     const newBankAccountId = dto.bankAccountId ?? old.bankAccountId;
     const newAmountInCents = dto.amount !== undefined ? Math.round(dto.amount * 100) : old.amount;
     const newType = dto.type ?? old.type;
 
-    return this.db.transaction(async (trx) => {
-      // Reverse old balance
+    const updated = await this.db.transaction(async (trx) => {
       const oldDelta = old.type === 'income' ? -old.amount : old.amount;
       await this.bankAccountRepository.updateBalance(old.bankAccountId, oldDelta, trx);
 
-      // Apply new balance
       const newDelta = newType === 'income' ? newAmountInCents : -newAmountInCents;
       await this.bankAccountRepository.updateBalance(newBankAccountId, newDelta, trx);
 
@@ -105,16 +121,36 @@ export class TransactionsService {
         trx,
       );
     });
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'transaction.updated',
+      entityType: 'transaction',
+      entityId: id,
+      metadata: { description: updated.description, amount: updated.amount },
+    });
+
+    return updated;
   }
 
-  async remove(id: string, workspaceId: string) {
+  async remove(id: string, workspaceId: string, userId: string) {
     const tx = await this.findOne(id, workspaceId);
 
-    return this.db.transaction(async (trx) => {
+    await this.db.transaction(async (trx) => {
       await this.transactionRepository.delete(id, workspaceId, trx);
 
       const delta = tx.type === 'income' ? -tx.amount : tx.amount;
       await this.bankAccountRepository.updateBalance(tx.bankAccountId, delta, trx);
+    });
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'transaction.deleted',
+      entityType: 'transaction',
+      entityId: id,
+      metadata: { description: tx.description },
     });
   }
 }
