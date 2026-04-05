@@ -33,6 +33,7 @@ import {
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
+import { GetUser } from '../../auth/decorators/get-user.decorator';
 
 @ApiTags('Bank Accounts')
 @ApiBearerAuth('access-token')
@@ -49,9 +50,10 @@ export class BankAccountsController {
   @ApiResponse({ status: 201, description: 'Bank account created' })
   create(
     @WorkspaceId() workspaceId: string,
+    @GetUser('userId') userId: string,
     @Body() dto: CreateBankAccountDto,
   ) {
-    return this.bankAccountsService.create(dto, workspaceId);
+    return this.bankAccountsService.create(dto, workspaceId, userId);
   }
 
   @Get()
@@ -81,9 +83,10 @@ export class BankAccountsController {
   update(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
     @Body() dto: UpdateBankAccountDto,
   ) {
-    return this.bankAccountsService.update(id, workspaceId, dto);
+    return this.bankAccountsService.update(id, workspaceId, dto, userId);
   }
 
   @Delete(':id')
@@ -95,8 +98,9 @@ export class BankAccountsController {
   remove(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
   ) {
-    return this.bankAccountsService.remove(id, workspaceId);
+    return this.bankAccountsService.remove(id, workspaceId, userId);
   }
 
   @Post('import-statement')

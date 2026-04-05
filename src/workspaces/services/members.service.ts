@@ -13,6 +13,7 @@ import { IWorkspaceMemberRepository } from '../../core/repositories/workspace-me
 import { IWorkspaceInviteRepository } from '../../core/repositories/workspace-invite.repository.interface';
 import { IWorkspaceRepository } from '../../core/repositories/workspace.repository.interface';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { ActivityService } from '../../activity/activity.service';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 import { InviteRole } from '../../core/entities/workspace-invite.entity';
@@ -30,6 +31,7 @@ export class MembersService {
     @Inject(IWorkspaceRepository)
     private readonly workspaceRepository: IWorkspaceRepository,
     private readonly notificationsService: NotificationsService,
+    private readonly activityService: ActivityService,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
@@ -109,9 +111,17 @@ export class MembersService {
         acceptUrl: `${FRONTEND_URL}/invites/${token}`,
       });
     } catch (err: unknown) {
-      // Loga o erro completo mas não aborta — o convite já foi criado no DB
       console.error('[MembersService] Failed to send invite email:', JSON.stringify(err));
     }
+
+    this.activityService.log({
+      workspaceId,
+      userId: invitedBy,
+      action: 'member.invited',
+      entityType: 'member',
+      entityId: workspaceId,
+      metadata: { email, role },
+    });
   }
 
   async getInviteByToken(token: string) {
@@ -171,6 +181,15 @@ export class MembersService {
     if (target.role === 'owner') throw new ForbiddenException('Não é possível remover o owner do workspace');
 
     await this.memberRepository.remove(memberId);
+
+    this.activityService.log({
+      workspaceId,
+      userId: requesterId,
+      action: 'member.removed',
+      entityType: 'member',
+      entityId: memberId,
+      metadata: { userId: target.userId },
+    });
   }
 
   async updateMemberRole(workspaceId: string, memberId: string, newRole: InviteRole, requesterId: string): Promise<void> {
@@ -189,6 +208,15 @@ export class MembersService {
     if (target.role === 'owner') throw new ForbiddenException('Não é possível rebaixar o owner');
 
     await this.memberRepository.updateRole(memberId, newRole as WorkspaceRole);
+
+    this.activityService.log({
+      workspaceId,
+      userId: requesterId,
+      action: 'member.roleUpdated',
+      entityType: 'member',
+      entityId: memberId,
+      metadata: { userId: target.userId, newRole },
+    });
   }
 
   async leaveWorkspace(workspaceId: string, userId: string): Promise<void> {
@@ -198,5 +226,14 @@ export class MembersService {
       throw new ForbiddenException('O owner não pode sair do workspace. Transfira a ownership primeiro.');
     }
     await this.memberRepository.remove(member.id);
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'member.left',
+      entityType: 'member',
+      entityId: member.id,
+      metadata: {},
+    });
   }
 }

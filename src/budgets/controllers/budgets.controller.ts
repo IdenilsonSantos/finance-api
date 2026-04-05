@@ -25,6 +25,7 @@ import { CreateBudgetDto, UpdateBudgetDto } from '../dto/budget.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
+import { GetUser } from '../../auth/decorators/get-user.decorator';
 
 @ApiTags('Budgets')
 @ApiBearerAuth('access-token')
@@ -37,8 +38,12 @@ export class BudgetsController {
   @ApiOperation({ summary: 'Create a budget for a category/month' })
   @ApiResponse({ status: 201, description: 'Budget created' })
   @ApiResponse({ status: 409, description: 'Budget already exists for this category/month' })
-  create(@WorkspaceId() workspaceId: string, @Body() dto: CreateBudgetDto) {
-    return this.budgetsService.create(dto, workspaceId);
+  create(
+    @WorkspaceId() workspaceId: string,
+    @GetUser('userId') userId: string,
+    @Body() dto: CreateBudgetDto,
+  ) {
+    return this.budgetsService.create(dto, workspaceId, userId);
   }
 
   // CRÍTICO: /summary deve vir ANTES de /:id
@@ -84,9 +89,10 @@ export class BudgetsController {
   update(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
     @Body() dto: UpdateBudgetDto,
   ) {
-    return this.budgetsService.update(id, workspaceId, dto);
+    return this.budgetsService.update(id, workspaceId, dto, userId);
   }
 
   @Delete(':id')
@@ -98,7 +104,8 @@ export class BudgetsController {
   remove(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
   ) {
-    return this.budgetsService.remove(id, workspaceId);
+    return this.budgetsService.remove(id, workspaceId, userId);
   }
 }

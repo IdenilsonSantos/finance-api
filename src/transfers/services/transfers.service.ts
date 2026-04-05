@@ -8,6 +8,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ITransferRepository } from '../../core/repositories/transfer.repository.interface';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { ActivityService } from '../../activity/activity.service';
 import { CreateTransferDto, ListTransfersDto } from '../dto/transfer.dto';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
@@ -21,9 +22,10 @@ export class TransfersService {
     private readonly bankAccountRepository: IBankAccountRepository,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly notificationsService: NotificationsService,
+    private readonly activityService: ActivityService,
   ) {}
 
-  async create(dto: CreateTransferDto, workspaceId: string) {
+  async create(dto: CreateTransferDto, workspaceId: string, userId: string) {
     if (dto.fromAccountId === dto.toAccountId) {
       throw new BadRequestException(
         'As contas de origem e destino devem ser diferentes',
@@ -71,6 +73,19 @@ export class TransfersService {
         }),
     );
 
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'transfer.created',
+      entityType: 'transfer',
+      entityId: transfer.id,
+      metadata: {
+        amount: transfer.amount,
+        fromAccount: fromAccount.name,
+        toAccount: toAccount.name,
+      },
+    });
+
     return transfer;
   }
 
@@ -90,13 +105,22 @@ export class TransfersService {
     return transfer;
   }
 
-  async remove(id: string, workspaceId: string) {
+  async remove(id: string, workspaceId: string, userId: string) {
     const transfer = await this.findOne(id, workspaceId);
 
-    return this.db.transaction(async (trx) => {
+    await this.db.transaction(async (trx) => {
       await this.transferRepository.delete(id, workspaceId, trx);
       await this.bankAccountRepository.updateBalance(transfer.fromAccountId, transfer.amount, trx);
       await this.bankAccountRepository.updateBalance(transfer.toAccountId, -transfer.amount, trx);
+    });
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'transfer.deleted',
+      entityType: 'transfer',
+      entityId: id,
+      metadata: { amount: transfer.amount },
     });
   }
 }

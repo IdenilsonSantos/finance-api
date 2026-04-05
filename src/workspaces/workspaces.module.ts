@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ActivityModule } from '../activity/activity.module';
 import { WorkspacesService } from './services/workspaces.service';
 import { MembersService } from './services/members.service';
 import { WorkspacesController } from './controllers/workspaces.controller';
@@ -14,7 +15,7 @@ import { IWorkspaceInviteRepository } from '../core/repositories/workspace-invit
 import { DrizzleWorkspaceInviteRepository } from '../infrastructure/database/drizzle/repositories/drizzle-workspace-invite.repository';
 
 @Module({
-  imports: [AuthModule, NotificationsModule],
+  imports: [AuthModule, NotificationsModule, ActivityModule],
   providers: [
     WorkspacesService,
     MembersService,

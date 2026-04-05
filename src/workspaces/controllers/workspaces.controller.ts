@@ -6,6 +6,7 @@ import {
   Patch,
   Delete,
   Param,
+  Query,
   ParseUUIDPipe,
   UseGuards,
   ForbiddenException,
@@ -18,9 +19,11 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { WorkspacesService } from '../services/workspaces.service';
 import { MembersService } from '../services/members.service';
+import { ActivityService } from '../../activity/activity.service';
 import {
   CreateWorkspaceDto,
   UpdateWorkspaceDto,
@@ -41,6 +44,7 @@ export class WorkspacesController {
   constructor(
     private readonly workspacesService: WorkspacesService,
     private readonly membersService: MembersService,
+    private readonly activityService: ActivityService,
   ) {}
 
   @Get('mine')
@@ -170,5 +174,34 @@ export class WorkspacesController {
     @GetUser('userId') userId: string,
   ) {
     return this.membersService.leaveWorkspace(workspaceId, userId);
+  }
+
+  // ── Activity ─────────────────────────────────────────────────────────────
+
+  @Get(':id/activity')
+  @UseGuards(WorkspaceGuard)
+  @ApiOperation({ summary: 'Get workspace activity log' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiQuery({ name: 'entityType', required: false, type: String, example: 'transaction' })
+  @ApiQuery({ name: 'userId', required: false, type: String, format: 'uuid' })
+  @ApiQuery({ name: 'action', required: false, type: String, example: 'transaction.created' })
+  @ApiResponse({ status: 200, description: 'Paginated activity log returned' })
+  getActivity(
+    @WorkspaceId() workspaceId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('entityType') entityType?: string,
+    @Query('userId') userId?: string,
+    @Query('action') action?: string,
+  ) {
+    return this.activityService.getActivity(workspaceId, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      entityType,
+      userId,
+      action,
+    });
   }
 }

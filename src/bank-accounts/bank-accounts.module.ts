@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
+import { ActivityModule } from '../activity/activity.module';
 import { BankAccountsService } from './services/bank-accounts.service';
 import { BankAccountsController } from './controllers/bank-accounts.controller';
 import { WorkspaceGuard } from '../workspaces/guards/workspace.guard';
@@ -12,7 +13,7 @@ import { StatementImportService } from './services/statement-import.service';
 import { CategoryInferenceService } from './services/category-inference.service';
 
 @Module({
-  imports: [WorkspacesModule],
+  imports: [WorkspacesModule, ActivityModule],
   providers: [
     BankAccountsService,
     OFXParserService,
