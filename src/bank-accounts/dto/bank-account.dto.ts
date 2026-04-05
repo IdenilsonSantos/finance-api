@@ -1,10 +1,13 @@
 import { IsString, IsIn, IsOptional, IsInt, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { BankAccountType } from '../../core/entities/bank-account.entity';
 
 export class CreateBankAccountDto {
+  @ApiProperty({ example: 'Conta Corrente Nubank' })
   @IsString()
-  name: string;
+  name!: string;
 
+  @ApiPropertyOptional({ enum: ['checking', 'savings', 'investment', 'cash'], example: 'checking' })
   @IsOptional()
   @IsIn(['checking', 'savings', 'investment', 'cash'], {
     message:
@@ -12,10 +15,12 @@ export class CreateBankAccountDto {
   })
   type?: BankAccountType;
 
+  @ApiPropertyOptional({ example: '#6366f1' })
   @IsOptional()
   @IsString()
   color?: string;
 
+  @ApiPropertyOptional({ example: 100000, description: 'Saldo inicial em centavos' })
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -23,10 +28,12 @@ export class CreateBankAccountDto {
 }
 
 export class UpdateBankAccountDto {
+  @ApiPropertyOptional({ example: 'Conta Poupança' })
   @IsOptional()
   @IsString()
   name?: string;
 
+  @ApiPropertyOptional({ enum: ['checking', 'savings', 'investment', 'cash'], example: 'savings' })
   @IsOptional()
   @IsIn(['checking', 'savings', 'investment', 'cash'], {
     message:
@@ -34,6 +41,7 @@ export class UpdateBankAccountDto {
   })
   type?: BankAccountType;
 
+  @ApiPropertyOptional({ example: '#22c55e' })
   @IsOptional()
   @IsString()
   color?: string;

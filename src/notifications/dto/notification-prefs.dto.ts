@@ -1,18 +1,23 @@
 import { IsBoolean, IsOptional } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateNotificationPrefsDto {
+  @ApiPropertyOptional({ example: true })
   @IsBoolean()
   @IsOptional()
   goalAchieved?: boolean;
 
+  @ApiPropertyOptional({ example: true })
   @IsBoolean()
   @IsOptional()
   goalDeadline?: boolean;
 
+  @ApiPropertyOptional({ example: true })
   @IsBoolean()
   @IsOptional()
   scheduledReminder?: boolean;
 
+  @ApiPropertyOptional({ example: false })
   @IsBoolean()
   @IsOptional()
   transferCreated?: boolean;

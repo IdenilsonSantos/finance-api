@@ -14,6 +14,14 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ScheduledTransactionsService } from '../services/scheduled-transactions.service';
 import {
   CreateScheduledTransactionDto,
@@ -24,6 +32,8 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
 
+@ApiTags('Scheduled Transactions')
+@ApiBearerAuth('access-token')
 @Controller('scheduled-transactions')
 @UseGuards(JwtAuthGuard, WorkspaceGuard)
 export class ScheduledTransactionsController {
@@ -32,6 +42,8 @@ export class ScheduledTransactionsController {
   ) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create a scheduled transaction' })
+  @ApiResponse({ status: 201, description: 'Scheduled transaction created' })
   create(
     @WorkspaceId() workspaceId: string,
     @Body() dto: CreateScheduledTransactionDto,
@@ -40,11 +52,21 @@ export class ScheduledTransactionsController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'List scheduled transactions with optional filters' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiQuery({ name: 'frequency', required: false, enum: ['once', 'daily', 'weekly', 'monthly', 'yearly'] })
+  @ApiQuery({ name: 'accountId', required: false, type: String, format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Paginated list of scheduled transactions' })
   findAll(@WorkspaceId() workspaceId: string, @Query() query: ListScheduledTransactionsDto) {
     return this.scheduledTransactionsService.findAll(workspaceId, query);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get scheduled transaction by ID' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Scheduled transaction returned' })
+  @ApiResponse({ status: 404, description: 'Scheduled transaction not found' })
   findOne(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -53,6 +75,10 @@ export class ScheduledTransactionsController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a scheduled transaction' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Scheduled transaction updated' })
+  @ApiResponse({ status: 404, description: 'Scheduled transaction not found' })
   update(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -63,6 +89,10 @@ export class ScheduledTransactionsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a scheduled transaction' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 204, description: 'Scheduled transaction deleted' })
+  @ApiResponse({ status: 404, description: 'Scheduled transaction not found' })
   remove(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -71,6 +101,11 @@ export class ScheduledTransactionsController {
   }
 
   @Post(':id/execute')
+  @ApiOperation({ summary: 'Manually execute a scheduled transaction' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Transaction created from scheduled' })
+  @ApiResponse({ status: 204, description: 'Already executed / end date reached' })
+  @ApiResponse({ status: 404, description: 'Scheduled transaction not found' })
   async execute(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
