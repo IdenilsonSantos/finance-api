@@ -12,9 +12,13 @@ import { IWorkspaceRepository } from '../core/repositories/workspace.repository.
 import { DrizzleWorkspaceRepository } from '../infrastructure/database/drizzle/repositories/drizzle-workspace.repository';
 import { IWorkspaceMemberRepository } from '../core/repositories/workspace-member.repository.interface';
 import { DrizzleWorkspaceMemberRepository } from '../infrastructure/database/drizzle/repositories/drizzle-workspace-member.repository';
+import { IAuthTokenRepository } from '../core/repositories/auth-token.repository.interface';
+import { DrizzleAuthTokenRepository } from '../infrastructure/database/drizzle/repositories/drizzle-auth-token.repository';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
+    NotificationsModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -37,6 +41,7 @@ import { DrizzleWorkspaceMemberRepository } from '../infrastructure/database/dri
       provide: IWorkspaceMemberRepository,
       useClass: DrizzleWorkspaceMemberRepository,
     },
+    { provide: IAuthTokenRepository, useClass: DrizzleAuthTokenRepository },
   ],
   exports: [
     AuthService,

@@ -3,6 +3,8 @@ import {
   Inject,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -13,9 +15,13 @@ import { RegisterDto, LoginDto } from '../dto/auth.dto';
 import { IUserRepository } from '../../core/repositories/user.repository.interface';
 import { IWorkspaceRepository } from '../../core/repositories/workspace.repository.interface';
 import { IWorkspaceMemberRepository } from '../../core/repositories/workspace-member.repository.interface';
+import { IAuthTokenRepository } from '../../core/repositories/auth-token.repository.interface';
+import { NotificationsService } from '../../notifications/services/notifications.service';
 import { UserEntity } from '../../core/entities/user.entity';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
+
+const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:3000';
 
 export interface AuthResponse {
   access_token: string;
@@ -23,6 +29,7 @@ export interface AuthResponse {
     id: string;
     name: string | null;
     email: string;
+    emailVerified: boolean;
   };
 }
 
@@ -37,6 +44,9 @@ export class AuthService {
     private readonly workspaceRepository: IWorkspaceRepository,
     @Inject(IWorkspaceMemberRepository)
     private readonly workspaceMemberRepository: IWorkspaceMemberRepository,
+    @Inject(IAuthTokenRepository)
+    private readonly authTokenRepository: IAuthTokenRepository,
+    private readonly notificationsService: NotificationsService,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly jwtService: JwtService,
   ) {}
@@ -70,6 +80,8 @@ export class AuthService {
 
       return user;
     });
+
+    this.sendVerificationEmail(newUser.id, newUser.email).catch(() => {});
 
     return this.generateAccessToken(newUser);
   }
@@ -171,6 +183,67 @@ export class AuthService {
     return REFRESH_TOKEN_COOKIE;
   }
 
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.userRepository.findByEmail(email);
+    if (!user) return; // silencioso — não revelar existência
+
+    await this.authTokenRepository.deleteByUserAndType(user.id, 'password_reset');
+
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1h
+
+    await this.authTokenRepository.create({ userId: user.id, tokenHash, type: 'password_reset', expiresAt });
+
+    const resetUrl = `${FRONTEND_URL}/auth/reset-password?token=${token}`;
+    this.notificationsService.sendPasswordReset({ to: email, resetUrl }).catch((err: unknown) => {
+      console.error('[AuthService] Failed to send password reset email:', err);
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const record = await this.authTokenRepository.findByHash(tokenHash, 'password_reset');
+
+    if (!record) throw new NotFoundException('Token inválido');
+    if (record.expiresAt < new Date()) throw new BadRequestException('Token expirado');
+    if (record.usedAt) throw new BadRequestException('Token já foi utilizado');
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.db.transaction(async (trx) => {
+      await trx.update(schema.user).set({ password: hashedPassword }).where(eq(schema.user.id, record.userId));
+      await trx.update(schema.refreshToken).set({ revoked: true }).where(eq(schema.refreshToken.userId, record.userId));
+    });
+
+    await this.authTokenRepository.markUsed(record.id);
+  }
+
+  async sendVerificationEmail(userId: string, email: string): Promise<void> {
+    await this.authTokenRepository.deleteByUserAndType(userId, 'email_verification');
+
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+    await this.authTokenRepository.create({ userId, tokenHash, type: 'email_verification', expiresAt });
+
+    const verifyUrl = `${FRONTEND_URL}/auth/verify-email?token=${token}`;
+    await this.notificationsService.sendEmailVerification({ to: email, verifyUrl });
+  }
+
+  async verifyEmail(token: string): Promise<void> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const record = await this.authTokenRepository.findByHash(tokenHash, 'email_verification');
+
+    if (!record) throw new NotFoundException('Token inválido');
+    if (record.expiresAt < new Date()) throw new BadRequestException('Token expirado');
+    if (record.usedAt) throw new BadRequestException('Token já foi utilizado');
+
+    await this.db.update(schema.user).set({ emailVerified: new Date() }).where(eq(schema.user.id, record.userId));
+    await this.authTokenRepository.markUsed(record.id);
+  }
+
   private generateAccessToken(user: UserEntity): AuthResponse {
     const payload = { sub: user.id, email: user.email };
     return {
@@ -179,6 +252,7 @@ export class AuthService {
         id: user.id,
         name: user.name ?? null,
         email: user.email,
+        emailVerified: !!user.emailVerified,
       },
     };
   }

@@ -22,6 +22,16 @@ export const refreshToken = pgTable('refreshToken', {
   createdAt: timestamp('createdAt').defaultNow().notNull(),
 });
 
+export const authToken = pgTable('authToken', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  tokenHash: text('tokenHash').notNull().unique(),
+  type: text('type', { enum: ['password_reset', 'email_verification'] }).notNull(),
+  expiresAt: timestamp('expiresAt').notNull(),
+  usedAt: timestamp('usedAt'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+});
+
 export const workspace = pgTable('workspace', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),

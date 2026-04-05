@@ -20,6 +20,8 @@ import {
   goalDeadlineReminderTemplate,
   budgetAlertTemplate,
   workspaceInviteTemplate,
+  passwordResetTemplate,
+  emailVerificationTemplate,
 } from '../email-templates';
 
 function formatDate(isoDate: string): string {
@@ -373,6 +375,22 @@ export class NotificationsService {
         workspaceName: params.workspaceName,
         acceptUrl: params.acceptUrl,
       }),
+    });
+  }
+
+  async sendPasswordReset(params: { to: string; resetUrl: string }): Promise<void> {
+    await this.emailService.send({
+      to: params.to,
+      subject: 'Redefinição de senha — Finance App',
+      html: passwordResetTemplate({ resetUrl: params.resetUrl }),
+    });
+  }
+
+  async sendEmailVerification(params: { to: string; verifyUrl: string }): Promise<void> {
+    await this.emailService.send({
+      to: params.to,
+      subject: 'Confirme seu e-mail — Finance App',
+      html: emailVerificationTemplate({ verifyUrl: params.verifyUrl }),
     });
   }
 

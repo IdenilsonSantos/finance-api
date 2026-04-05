@@ -188,6 +188,26 @@ export function workspaceInviteTemplate(params: {
   `);
 }
 
+export function passwordResetTemplate(params: { resetUrl: string }): string {
+  return layout(`
+    ${badge('#1D4ED8', '#DBEAFE', '🔐', 'Segurança')}
+    ${heading('Redefinir sua senha')}
+    ${subtext(`Recebemos uma solicitação para redefinir a senha da sua conta. Clique no botão abaixo para criar uma nova senha. Este link expira em <strong style="color:#111827;">1 hora</strong>.`)}
+    ${ctaButton('Redefinir senha', params.resetUrl)}
+    <p style="margin:20px 0 0;font-size:12px;color:#9CA3AF;text-align:center;">Se você não solicitou a redefinição de senha, ignore este e-mail. Sua senha permanecerá a mesma.</p>
+  `);
+}
+
+export function emailVerificationTemplate(params: { verifyUrl: string }): string {
+  return layout(`
+    ${badge('#065F46', '#D1FAE5', '✔', 'Verificação')}
+    ${heading('Confirme seu e-mail')}
+    ${subtext(`Obrigado por se cadastrar no Finance App! Clique no botão abaixo para confirmar seu endereço de e-mail e ativar sua conta. Este link expira em <strong style="color:#111827;">24 horas</strong>.`)}
+    ${ctaButton('Verificar e-mail', params.verifyUrl)}
+    <p style="margin:20px 0 0;font-size:12px;color:#9CA3AF;text-align:center;">Se você não criou uma conta, ignore este e-mail.</p>
+  `);
+}
+
 export function budgetAlertTemplate(params: {
   category: string;
   percent: number;

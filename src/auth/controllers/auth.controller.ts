@@ -19,7 +19,7 @@ import {
   ApiCookieAuth,
 } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
-import { RegisterDto, LoginDto } from '../dto/auth.dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto } from '../dto/auth.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { GetUser } from '../decorators/get-user.decorator';
 
@@ -125,5 +125,44 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getMe(@GetUser() user: { userId: string; email: string }) {
     return user;
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Request a password reset email' })
+  @ApiResponse({ status: 204, description: 'If the email exists, a reset link was sent' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Reset password using token from email' })
+  @ApiResponse({ status: 204, description: 'Password reset successfully' })
+  @ApiResponse({ status: 400, description: 'Token expired or already used' })
+  @ApiResponse({ status: 404, description: 'Invalid token' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.password);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Verify email address using token from email' })
+  @ApiResponse({ status: 204, description: 'Email verified successfully' })
+  @ApiResponse({ status: 400, description: 'Token expired or already used' })
+  @ApiResponse({ status: 404, description: 'Invalid token' })
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Resend email verification link' })
+  @ApiResponse({ status: 204, description: 'Verification email sent' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async resendVerification(@GetUser() user: { userId: string; email: string }) {
+    return this.authService.sendVerificationEmail(user.userId, user.email);
   }
 }

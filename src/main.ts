@@ -9,6 +9,8 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  app.setGlobalPrefix('api');
+
   // Habilitar validação global (uso do class-validator)
   app.useGlobalPipes(
     new ValidationPipe({
