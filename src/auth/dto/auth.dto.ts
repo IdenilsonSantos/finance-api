@@ -26,3 +26,28 @@ export class LoginDto {
   @IsNotEmpty()
   password!: string;
 }
+
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'joao@email.com' })
+  @IsEmail()
+  email!: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ description: 'Token received in the reset email' })
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+
+  @ApiProperty({ example: 'novaSenha123', minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  password!: string;
+}
+
+export class VerifyEmailDto {
+  @ApiProperty({ description: 'Token received in the verification email' })
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+}
