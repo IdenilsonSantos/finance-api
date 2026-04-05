@@ -15,6 +15,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { BankAccountsService } from '../services/bank-accounts.service';
 import { StatementImportService } from '../services/statement-import.service';
 import {
@@ -25,6 +34,8 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
 
+@ApiTags('Bank Accounts')
+@ApiBearerAuth('access-token')
 @Controller('bank-accounts')
 @UseGuards(JwtAuthGuard, WorkspaceGuard)
 export class BankAccountsController {
@@ -34,6 +45,8 @@ export class BankAccountsController {
   ) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create a bank account' })
+  @ApiResponse({ status: 201, description: 'Bank account created' })
   create(
     @WorkspaceId() workspaceId: string,
     @Body() dto: CreateBankAccountDto,
@@ -42,11 +55,17 @@ export class BankAccountsController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'List all bank accounts in the workspace' })
+  @ApiResponse({ status: 200, description: 'List of bank accounts returned' })
   findAll(@WorkspaceId() workspaceId: string) {
     return this.bankAccountsService.findAll(workspaceId);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get bank account by ID' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Bank account returned' })
+  @ApiResponse({ status: 404, description: 'Bank account not found' })
   findOne(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -55,6 +74,10 @@ export class BankAccountsController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update bank account' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Bank account updated' })
+  @ApiResponse({ status: 404, description: 'Bank account not found' })
   update(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -65,6 +88,10 @@ export class BankAccountsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete bank account' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 204, description: 'Bank account deleted' })
+  @ApiResponse({ status: 404, description: 'Bank account not found' })
   remove(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -76,6 +103,19 @@ export class BankAccountsController {
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
   )
+  @ApiOperation({ summary: 'Import OFX/PDF statement (auto-detect account)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        bankAccountId: { type: 'string', format: 'uuid' },
+        force: { type: 'string', example: 'false' },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Statement imported successfully' })
   importStatementAuto(
     @WorkspaceId() workspaceId: string,
     @UploadedFile() file: Express.Multer.File,
@@ -96,6 +136,18 @@ export class BankAccountsController {
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
   )
+  @ApiOperation({ summary: 'Import OFX statement into a specific bank account' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Statement imported successfully' })
   importStatement(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) bankAccountId: string,
