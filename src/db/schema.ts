@@ -228,3 +228,12 @@ export const statementImport = pgTable('statementImport', {
   total: integer('total').notNull().default(0),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
 });
+
+export const adminUser = pgTable('adminUser', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull().unique(),
+  password: text('password').notNull(),
+  name: text('name').notNull(),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+});

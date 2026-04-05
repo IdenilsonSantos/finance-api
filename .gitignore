@@ -44,3 +44,4 @@ lerna-debug.log*
 
 # Claude
 .claude
+CLAUDE.md

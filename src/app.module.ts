@@ -13,6 +13,7 @@ import { BudgetsModule } from './budgets/budgets.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { GoalsModule } from './goals/goals.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     NotificationsModule,
     GoalsModule,
     DashboardModule,
+    AdminModule,
   ],
   controllers: [],
   providers: [],
