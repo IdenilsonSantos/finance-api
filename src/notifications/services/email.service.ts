@@ -50,12 +50,15 @@ export class EmailService {
         html: params.html,
       });
     } else {
-      await this.resend!.emails.send({
+      const { error } = await this.resend!.emails.send({
         from: this.from,
         to: params.to,
         subject: params.subject,
         html: params.html,
       });
+      if (error) {
+        throw new Error(`Resend error: ${error.message}`);
+      }
     }
   }
 }
