@@ -6,35 +6,210 @@ function layout(content: string): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Finance App</title>
+
+  <meta name="color-scheme" content="light" />
+  <meta name="supported-color-schemes" content="light" />
+
+  <title>Contaê</title>
 </head>
-<body style="margin:0;padding:0;background-color:#F4F5F7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F5F7;padding:40px 16px;">
+
+<body
+  style="
+    margin:0;
+    padding:0;
+    background-color:#F4F5F7;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    color:#252832;
+  "
+>
+
+  <!-- Fundo -->
+  <table
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    border="0"
+    style="
+      width:100%;
+      background-color:#F4F5F7;
+    "
+  >
     <tr>
-      <td align="center">
-        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+      <td
+        align="center"
+        style="
+          padding:48px 16px;
+        "
+      >
+
+        <!-- Container principal -->
+        <table
+          width="100%"
+          cellpadding="0"
+          cellspacing="0"
+          border="0"
+          style="
+            width:100%;
+            max-width:580px;
+          "
+        >
+
+          <!-- ========================================= -->
+          <!-- HEADER                                    -->
+          <!-- ========================================= -->
 
           <tr>
-            <td style="background-color:#1E1E2D;border-radius:16px 16px 0 0;padding:28px 40px;text-align:center;">
-              <span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">Finance App</span>
+            <td
+              align="center"
+              style="
+                background-color:#868A94;
+                padding:30px 40px;
+                border-radius:14px 14px 0 0;
+              "
+            >
+
+              <div
+                style="
+                  font-size:21px;
+                  line-height:28px;
+                  font-weight:700;
+                  letter-spacing:-0.5px;
+                  color:#FFFFFF;
+                "
+              >
+                Finance App
+              </div>
+
             </td>
           </tr>
 
+
+          <!-- ========================================= -->
+          <!-- CONTEÚDO                                  -->
+          <!-- ========================================= -->
+
           <tr>
-            <td style="background-color:#ffffff;padding:40px;border-radius:0 0 16px 16px;">
+            <td
+              style="
+                background-color:#FFFFFF;
+                padding:42px 44px 36px;
+                border-radius:0 0 14px 14px;
+              "
+            >
+
+              <!--
+                ==================================================
+                CONTEÚDO DINÂMICO
+                ==================================================
+
+                O conteúdo específico da notificação será
+                inserido aqui através da variável ${content}.
+              -->
+
               ${content}
-              <hr style="border:none;border-top:1px solid #F0F0F0;margin:32px 0 24px;" />
-              <p style="margin:0;font-size:12px;color:#9CA3AF;text-align:center;line-height:1.6;">
-                Você recebeu este e-mail porque tem notificações ativadas no Finance App.<br />
-                <a href="${BASE_URL}/settings" style="color:#6B7280;text-decoration:underline;">Gerenciar preferências</a>
-              </p>
+
+
+              <!-- ========================================= -->
+              <!-- DIVISÓRIA                                  -->
+              <!-- ========================================= -->
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+                style="
+                  width:100%;
+                  margin-top:36px;
+                "
+              >
+                <tr>
+                  <td
+                    style="
+                      border-top:1px solid #E5E7EB;
+                      font-size:0;
+                      line-height:0;
+                    "
+                  >
+                    &nbsp;
+                  </td>
+                </tr>
+              </table>
+
+
+              <!-- ========================================= -->
+              <!-- RODAPÉ                                    -->
+              <!-- ========================================= -->
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+                style="
+                  width:100%;
+                  margin-top:24px;
+                "
+              >
+                <tr>
+                  <td
+                    align="center"
+                    style="
+                      font-size:12px;
+                      line-height:19px;
+                      color:#9CA3AF;
+                    "
+                  >
+
+                    Você recebeu este e-mail porque possui
+                    notificações ativadas no Finance App.
+
+                    <br />
+
+                    <a
+                      href="${BASE_URL}/settings"
+                      style="
+                        color:#6B7280;
+                        text-decoration:underline;
+                        font-weight:500;
+                      "
+                    >
+                      Gerenciar preferências
+                    </a>
+
+                  </td>
+                </tr>
+              </table>
+
             </td>
           </tr>
+
+
+          <!-- ========================================= -->
+          <!-- ASSINATURA                                 -->
+          <!-- ========================================= -->
+
+          <tr>
+            <td
+              align="center"
+              style="
+                padding:22px 20px 0;
+                font-size:11px;
+                line-height:18px;
+                color:#AEB3BC;
+              "
+            >
+              Finance App
+            </td>
+          </tr>
+
 
         </table>
+
       </td>
     </tr>
   </table>
+
 </body>
 </html>`;
 }
