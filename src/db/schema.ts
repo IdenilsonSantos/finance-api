@@ -72,6 +72,9 @@ export const bankAccount = pgTable('bankAccount', {
     .default('checking'),
   color: text('color').notNull().default('#6366f1'),
   balance: integer('balance').notNull().default(0),
+  // Data até a qual o saldo acima está confirmado por extrato importado
+  // (LEDGERBAL). Nulo se a conta nunca teve extrato importado.
+  balanceAsOf: date('balanceAsOf'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
@@ -236,6 +239,18 @@ export const statementImport = pgTable('statementImport', {
   imported: integer('imported').notNull().default(0),
   duplicates: integer('duplicates').notNull().default(0),
   total: integer('total').notNull().default(0),
+  // Período coberto pelo extrato (BANKTRANLIST DTSTART/DTEND).
+  periodStart: date('periodStart'),
+  periodEnd: date('periodEnd'),
+  // Saldo informado pelo banco (LEDGERBAL) e a data a que ele se refere.
+  bankBalance: integer('bankBalance'),
+  bankBalanceAsOf: date('bankBalanceAsOf'),
+  // Saldo recalculado a partir do histórico + novas transações.
+  calculatedBalance: integer('calculatedBalance'),
+  // calculatedBalance - bankBalance.
+  divergence: integer('divergence'),
+  // false quando houve divergência confirmada mesmo assim (force).
+  reconciled: boolean('reconciled').notNull().default(true),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
 });
 

@@ -177,15 +177,33 @@ export class DashboardService {
       .filter((s) => s.type === 'income')
       .reduce((acc, s) => acc + s.amount, 0);
 
-    const daysInMonth = new Date(
-      now.getFullYear(),
-      now.getMonth() + 1,
+    // Estimativa do que falta gastar no mês: média dos últimos meses
+    // FECHADOS (até 3), em vez de extrapolar o ritmo de hoje (que distorce
+    // muito quando contas grandes já foram pagas em lote no início do mês).
+    const closedMonthExpenses = new Map<string, number>();
+    for (const t of transactions) {
+      const key = t.date.substring(0, 7);
+      if (key === currentMonth || t.type !== 'expense') continue;
+      closedMonthExpenses.set(key, (closedMonthExpenses.get(key) ?? 0) + t.amount);
+    }
+    const recentClosedMonths = Array.from(closedMonthExpenses.keys())
+      .sort()
+      .slice(-3)
+      .map((key) => closedMonthExpenses.get(key)!);
+
+    // Com menos de 2 meses fechados, um único mês (possivelmente atípico)
+    // definiria 100% da previsão. Sem histórico suficiente, assume que o já
+    // gasto é a estimativa do mês inteiro (estimatedRemainingExpenses = 0).
+    const MIN_CLOSED_MONTHS_FOR_PROJECTION = 2;
+    const historicalAvgMonthlyExpense =
+      recentClosedMonths.length >= MIN_CLOSED_MONTHS_FOR_PROJECTION
+        ? recentClosedMonths.reduce((a, b) => a + b, 0) / recentClosedMonths.length
+        : monthExpenses;
+
+    const estimatedRemainingExpenses = Math.max(
       0,
-    ).getDate();
-    const currentDay = now.getDate();
-    const dailySpent = currentDay > 0 ? monthExpenses / currentDay : 0;
-    const estimatedRemainingExpenses =
-      dailySpent * (daysInMonth - currentDay);
+      historicalAvgMonthlyExpense - monthExpenses,
+    );
 
     const projectedLiquidBalance =
       availableLiquidity + upcomingIncome - estimatedRemainingExpenses;

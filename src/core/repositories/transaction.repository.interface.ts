@@ -30,4 +30,17 @@ export interface ITransactionRepository {
     bankAccountId: string,
     fitIds: string[],
   ): Promise<string[]>;
+  /** Transações de uma conta num período (inclusive); usado para detectar duplicidades sem FITID. */
+  findByBankAccountInDateRange(
+    bankAccountId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<TransactionEntity[]>;
+  /** Soma líquida (entradas - saídas) de uma conta até `asOfDate`; usado para conciliar com o banco. */
+  sumBalanceByBankAccountUpToDate(
+    bankAccountId: string,
+    asOfDate: string,
+  ): Promise<number>;
+  /** Data da transação mais antiga de uma conta, ou null; usado para detectar extratos retroativos. */
+  findEarliestDateByBankAccount(bankAccountId: string): Promise<string | null>;
 }

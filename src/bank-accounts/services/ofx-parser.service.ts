@@ -13,9 +13,21 @@ export interface OFXAccountInfo {
   type: 'checking' | 'savings' | 'investment' | 'cash';
 }
 
+export interface OFXStatementPeriod {
+  start: string;
+  end: string;
+}
+
+export interface OFXLedgerBalance {
+  amountInCents: number;
+  asOf: string;
+}
+
 export interface OFXParseResult {
   transactions: OFXTransaction[];
   accountInfo: OFXAccountInfo | null;
+  period: OFXStatementPeriod | null;
+  ledgerBalance: OFXLedgerBalance | null;
 }
 
 @Injectable()
@@ -28,7 +40,12 @@ export class OFXParserService {
       throw new BadRequestException('Arquivo inválido. Envie um arquivo OFX válido.');
     }
 
-    return { transactions, accountInfo: this.extractAccountInfo(content) };
+    return {
+      transactions,
+      accountInfo: this.extractAccountInfo(content),
+      period: this.extractPeriod(content),
+      ledgerBalance: this.extractLedgerBalance(content),
+    };
   }
 
   private decodeBuffer(buffer: Buffer): string {
@@ -105,6 +122,44 @@ export class OFXParserService {
     if (!name && !acctType) return null;
 
     return { name, type };
+  }
+
+  private extractPeriod(content: string): OFXStatementPeriod | null {
+    // DTSTART/DTEND ficam dentro do bloco <BANKTRANLIST>, que delimita o
+    // período coberto pelo extrato (não pelas transações individuais).
+    const section = this.extractSection(content, 'BANKTRANLIST') ?? content;
+    const start = this.extractTag(section, 'DTSTART');
+    const end = this.extractTag(section, 'DTEND');
+
+    if (!start || !end) return null;
+
+    return { start: this.parseDate(start), end: this.parseDate(end) };
+  }
+
+  private extractLedgerBalance(content: string): OFXLedgerBalance | null {
+    // LEDGERBAL representa o saldo da conta em um instante (DTASOF), não uma
+    // movimentação. Usado apenas para conciliar, nunca somado ao saldo atual.
+    const section = this.extractSection(content, 'LEDGERBAL');
+    if (!section) return null;
+
+    const amountStr = this.extractTag(section, 'BALAMT');
+    const asOf = this.extractTag(section, 'DTASOF');
+    if (!amountStr || !asOf) return null;
+
+    const amount = parseFloat(amountStr.replace(',', '.'));
+    if (isNaN(amount)) return null;
+
+    return {
+      amountInCents: Math.round(amount * 100),
+      asOf: this.parseDate(asOf),
+    };
+  }
+
+  private extractSection(content: string, tag: string): string | null {
+    const match = content.match(
+      new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'),
+    );
+    return match?.[1] ?? null;
   }
 
   private extractTag(content: string, tag: string): string | undefined {

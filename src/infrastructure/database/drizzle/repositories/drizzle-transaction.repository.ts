@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte, count, inArray, isNotNull, ilike, or, SQL } from 'drizzle-orm';
+import { eq, and, gte, lte, count, inArray, isNotNull, ilike, or, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { TransactionEntity } from '../../../../core/entities/transaction.entity';
@@ -147,5 +147,51 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
         ),
       );
     return results.map((r) => r.externalId!);
+  }
+
+  async findByBankAccountInDateRange(
+    bankAccountId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<TransactionEntity[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.transaction)
+      .where(
+        and(
+          eq(schema.transaction.bankAccountId, bankAccountId),
+          gte(schema.transaction.date, startDate),
+          lte(schema.transaction.date, endDate),
+        ),
+      );
+    return rows.map((r) => new TransactionEntity(r));
+  }
+
+  async sumBalanceByBankAccountUpToDate(
+    bankAccountId: string,
+    asOfDate: string,
+  ): Promise<number> {
+    const [result] = await this.db
+      .select({
+        balance: sql<string>`coalesce(sum(case when ${schema.transaction.type} = 'income' then ${schema.transaction.amount} else -${schema.transaction.amount} end), 0)`,
+      })
+      .from(schema.transaction)
+      .where(
+        and(
+          eq(schema.transaction.bankAccountId, bankAccountId),
+          lte(schema.transaction.date, asOfDate),
+        ),
+      );
+    return Number(result?.balance ?? 0);
+  }
+
+  async findEarliestDateByBankAccount(bankAccountId: string): Promise<string | null> {
+    const [result] = await this.db
+      .select({ date: schema.transaction.date })
+      .from(schema.transaction)
+      .where(eq(schema.transaction.bankAccountId, bankAccountId))
+      .orderBy(schema.transaction.date)
+      .limit(1);
+    return result?.date ?? null;
   }
 }

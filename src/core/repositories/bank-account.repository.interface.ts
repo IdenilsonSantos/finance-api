@@ -19,5 +19,7 @@ export interface IBankAccountRepository {
     delta: number,
     trx: any,
   ): Promise<BankAccountEntity>;
+  /** Avança `balanceAsOf` para `asOfDate`, sem nunca retroceder. */
+  advanceBalanceAsOf(id: string, asOfDate: string, trx: any): Promise<void>;
   delete(id: string, workspaceId: string): Promise<void>;
 }

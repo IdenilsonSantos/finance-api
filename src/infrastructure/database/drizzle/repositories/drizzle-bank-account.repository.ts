@@ -78,6 +78,17 @@ export class DrizzleBankAccountRepository implements IBankAccountRepository {
     return new BankAccountEntity(result);
   }
 
+  async advanceBalanceAsOf(id: string, asOfDate: string, trx: any): Promise<void> {
+    const db = trx || this.db;
+    await db
+      .update(schema.bankAccount)
+      .set({
+        balanceAsOf: sql`greatest(coalesce(${schema.bankAccount.balanceAsOf}, ${asOfDate}), ${asOfDate})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.bankAccount.id, id));
+  }
+
   async delete(id: string, workspaceId: string): Promise<void> {
     await this.db
       .delete(schema.bankAccount)

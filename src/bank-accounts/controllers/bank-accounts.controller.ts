@@ -116,6 +116,7 @@ export class BankAccountsController {
         file: { type: 'string', format: 'binary' },
         bankAccountId: { type: 'string', format: 'uuid' },
         force: { type: 'string', example: 'false' },
+        adjustToBankBalance: { type: 'string', example: 'false' },
       },
     },
   })
@@ -125,6 +126,7 @@ export class BankAccountsController {
     @UploadedFile() file: Express.Multer.File,
     @Body('bankAccountId') bankAccountId?: string,
     @Body('force') force?: string,
+    @Body('adjustToBankBalance') adjustToBankBalance?: string,
   ) {
     if (!file) throw new BadRequestException('Nenhum arquivo enviado');
     return this.statementImportService.importOFX(
@@ -133,6 +135,7 @@ export class BankAccountsController {
       file.buffer,
       file.originalname,
       force === 'true',
+      adjustToBankBalance === 'true',
     );
   }
 
@@ -148,6 +151,8 @@ export class BankAccountsController {
       type: 'object',
       properties: {
         file: { type: 'string', format: 'binary' },
+        force: { type: 'string', example: 'false' },
+        adjustToBankBalance: { type: 'string', example: 'false' },
       },
     },
   })
@@ -156,12 +161,17 @@ export class BankAccountsController {
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) bankAccountId: string,
     @UploadedFile() file: Express.Multer.File,
+    @Body('force') force?: string,
+    @Body('adjustToBankBalance') adjustToBankBalance?: string,
   ) {
     if (!file) throw new BadRequestException('Nenhum arquivo enviado');
     return this.statementImportService.importOFX(
       bankAccountId,
       workspaceId,
       file.buffer,
+      file.originalname,
+      force === 'true',
+      adjustToBankBalance === 'true',
     );
   }
 }

@@ -1,4 +1,5 @@
-import { IsString, IsIn, IsNumber, IsPositive, IsDateString, IsUUID, IsOptional, ValidateIf } from 'class-validator';
+import { IsString, IsIn, IsNumber, IsPositive, IsDateString, IsUUID, IsOptional, IsInt, Min, Max, ValidateIf } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { TransactionType } from '../../core/entities/transaction.entity';
 import { PaginationDto } from '../../core/dto/pagination.dto';
@@ -44,6 +45,17 @@ export class CreateTransactionDto {
 }
 
 export class ListTransactionsDto extends PaginationDto {
+  // Sobrescreve o limite padrão (máx. 100): o front usa um limit maior
+  // (500) para calcular os totais de receitas/despesas do mês nos cards
+  // da tela de transações, sem paginar essa consulta.
+  @ApiPropertyOptional({ example: 20, minimum: 1, maximum: 500 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit?: number = 20;
+
   @ApiPropertyOptional({ enum: ['income', 'expense'] })
   @IsOptional()
   @IsIn(['income', 'expense'])
