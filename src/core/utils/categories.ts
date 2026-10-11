@@ -15,6 +15,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   others: 'Outros',
   outros: 'Outros',
   adjustment: 'Ajuste',
+  own_transfer: 'Transferência entre contas',
 };
 
 export function categoryLabel(category: string): string {
@@ -23,10 +24,10 @@ export function categoryLabel(category: string): string {
 
 /** Categorias padrão (chaves fixas), válidas em todo workspace. */
 export const BUILTIN_CATEGORIES: { key: string; type: 'income' | 'expense' }[] = [
-  ...['food', 'transport', 'health', 'education', 'entertainment', 'clothing', 'housing', 'utilities', 'others'].map(
+  ...['food', 'transport', 'health', 'education', 'entertainment', 'clothing', 'housing', 'utilities', 'own_transfer', 'others'].map(
     (key) => ({ key, type: 'expense' as const }),
   ),
-  ...['salary', 'freelance', 'investment', 'others'].map((key) => ({ key, type: 'income' as const })),
+  ...['salary', 'freelance', 'investment', 'own_transfer', 'others'].map((key) => ({ key, type: 'income' as const })),
 ];
 
 export function isBuiltinCategory(key: string): boolean {

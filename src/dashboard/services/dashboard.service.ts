@@ -5,7 +5,7 @@ import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
-import { ADJUSTMENT_CATEGORY } from '../../core/entities/transaction.entity';
+import { isNonFlowCategory } from '../../core/entities/transaction.entity';
 import { GLOBAL_BUDGET_CATEGORY } from '../../infrastructure/database/drizzle/repositories/drizzle-budget.repository';
 import { parseISODate, todayISO } from '../../core/utils/date';
 
@@ -141,9 +141,9 @@ export class DashboardService {
           .limit(5),
       ]);
 
-    // Ajustes de saldo (saldo inicial, conciliação) não são receita/despesa:
+    // Ajustes de saldo e transferências entre contas próprias não são receita/despesa:
     // ficam fora de todos os totais, gráficos e orçamentos.
-    const flowTxs = transactions.filter((t) => t.category !== ADJUSTMENT_CATEGORY);
+    const flowTxs = transactions.filter((t) => !isNonFlowCategory(t.category));
     // Receitas/despesas realizadas consideram só o que foi efetivado.
     const paidFlowTxs = flowTxs.filter((t) => t.status === 'paid');
 

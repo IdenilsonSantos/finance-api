@@ -18,6 +18,19 @@ export function balanceEffect(t: { type: TransactionType; amount: number; status
  */
 export const ADJUSTMENT_CATEGORY = 'adjustment';
 
+/**
+ * Pix/TED entre contas do próprio usuário quando a outra conta não está no
+ * app (ex.: do Nubank para o Itaú). Também não é receita nem despesa.
+ */
+export const OWN_TRANSFER_CATEGORY = 'own_transfer';
+
+/** Categorias que movimentam saldo mas ficam fora de receitas/despesas. */
+export const NON_FLOW_CATEGORIES = [ADJUSTMENT_CATEGORY, OWN_TRANSFER_CATEGORY];
+
+export function isNonFlowCategory(category: string): boolean {
+  return NON_FLOW_CATEGORIES.includes(category);
+}
+
 export class TransactionEntity {
   id: string;
   workspaceId: string;

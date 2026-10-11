@@ -71,12 +71,16 @@ describe('StatementImportService', () => {
   let bankAccountRepository: any;
   let transactionRepository: any;
   let categoryInference: any;
+  let memberNamesSpy: jest.SpyInstance;
   let investmentAccounts: any;
   let transferRepository: any;
   let db: any;
   let service: StatementImportService;
 
   beforeEach(() => {
+    memberNamesSpy = jest
+      .spyOn(StatementImportService.prototype as any, 'memberNames')
+      .mockResolvedValue(['Idenilson Santos de Oliveira']);
     bankAccountRepository = {
       findAllByWorkspace: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue({
@@ -325,6 +329,29 @@ describe('StatementImportService', () => {
     expect(transferRepository.create).not.toHaveBeenCalled();
     expect(transactionRepository.create).toHaveBeenCalledTimes(1);
     expect(result.cardPayments).toBe(0);
+  });
+
+  it('Pix entre contas do próprio usuário vira "Transferência entre contas"', async () => {
+    const file = statement({
+      start: '20261001000000',
+      end: '20261010235959',
+      transactions: [
+        { fitId: 'OWN1', date: '20261007', amount: '-180.00', memo: 'Transferência enviada pelo Pix - IDENILSON SANTOS DE OLIVEIRA - ITAÚ' },
+        { fitId: 'OTH1', date: '20261006', amount: '-358.00', memo: 'Transferência enviada pelo Pix - IVETE DE LIMA - BRADESCO' },
+      ],
+    });
+
+    await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(memberNamesSpy).toHaveBeenCalledWith(workspaceId);
+    expect(transactionRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ externalId: 'OWN1', category: 'own_transfer' }),
+      db,
+    );
+    expect(transactionRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ externalId: 'OTH1', category: 'other' }),
+      db,
+    );
   });
 
   it('não converte movimentos em cartão de crédito', async () => {

@@ -27,6 +27,7 @@ import {
   ADJUSTMENT_CATEGORY,
   TransactionEntity,
   balanceEffect,
+  isNonFlowCategory,
 } from '../../core/entities/transaction.entity';
 import { BudgetAlertsService, BudgetChange } from '../../alerts/services/budget-alerts.service';
 import { assertAccountActive } from '../../core/utils/accounts';
@@ -41,7 +42,7 @@ function budgetChanges(
   sign: 1 | -1,
 ): BudgetChange[] {
   return txs
-    .filter((t) => t.type === 'expense' && t.category !== ADJUSTMENT_CATEGORY)
+    .filter((t) => t.type === 'expense' && !isNonFlowCategory(t.category))
     .map((t) => ({ month: t.date.slice(0, 7), category: t.category, delta: sign * t.amount }));
 }
 

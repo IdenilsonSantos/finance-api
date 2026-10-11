@@ -12,10 +12,11 @@ import { IBankAccountRepository } from '../../core/repositories/bank-account.rep
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
-import { TransactionEntity, balanceEffect } from '../../core/entities/transaction.entity';
+import { OWN_TRANSFER_CATEGORY, TransactionEntity, balanceEffect } from '../../core/entities/transaction.entity';
 import { assertAccountActive } from '../../core/utils/accounts';
 import { classifyInvestmentMovement } from '../../core/utils/investments';
 import { isCardBillPayment, pickCardForPayment } from '../../core/utils/card-payments';
+import { isOwnTransfer } from '../../core/utils/own-transfers';
 import { ITransferRepository } from '../../core/repositories/transfer.repository.interface';
 import { InvestmentAccountsService } from './investment-accounts.service';
 import { addDays, differenceInCalendarDays } from 'date-fns';
@@ -385,6 +386,10 @@ export class StatementImportService {
       if (card) cardPayments.set(t.fitId, card);
     }
 
+    // Pix/TED para ou de alguém do próprio workspace: transferência entre contas
+    // próprias (fora de receitas/despesas), mesmo sem a outra conta no app.
+    const memberNames = await this.memberNames(workspaceId);
+
     // Insere em lote dentro de uma única transação de banco
     await this.db.transaction(async (trx) => {
       let totalDelta = 0;
@@ -443,7 +448,9 @@ export class StatementImportService {
             amount: t.amountInCents,
             type: t.type,
             description: t.description,
-            category: this.categoryInference.infer(t.description, t.type),
+            category: isOwnTransfer(t.description, memberNames)
+              ? OWN_TRANSFER_CATEGORY
+              : this.categoryInference.infer(t.description, t.type),
             date: t.date,
             externalId: t.fitId,
           },
@@ -551,5 +558,15 @@ export class StatementImportService {
         ? possibleRedundantAdjustments
         : undefined,
     };
+  }
+
+  /** Nomes das pessoas do workspace, para reconhecer transferências próprias. */
+  private async memberNames(workspaceId: string): Promise<(string | null)[]> {
+    const rows = await this.db
+      .select({ name: schema.user.name })
+      .from(schema.workspaceMember)
+      .innerJoin(schema.user, eq(schema.workspaceMember.userId, schema.user.id))
+      .where(eq(schema.workspaceMember.workspaceId, workspaceId));
+    return rows.map((m) => m.name);
   }
 }
