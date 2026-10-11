@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte, or, count, SQL } from 'drizzle-orm';
+import { eq, and, gte, lte, or, count, SQL, desc } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { TransferEntity } from '../../../../core/entities/transfer.entity';
@@ -55,7 +55,7 @@ export class DrizzleTransferRepository implements ITransferRepository {
       .select()
       .from(schema.transfer)
       .where(where)
-      .orderBy(schema.transfer.date, schema.transfer.createdAt)
+      .orderBy(desc(schema.transfer.date), desc(schema.transfer.createdAt))
       .limit(lim)
       .offset(offset);
 

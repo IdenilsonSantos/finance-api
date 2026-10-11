@@ -128,6 +128,39 @@ describe('StatementImportService', () => {
     );
   });
 
+  it('importa todas as transações do extrato, sem cortar em 50 por mês', async () => {
+    const transactions = Array.from({ length: 60 }, (_, i) => ({
+      fitId: `TX${i}`,
+      date: '20260805',
+      amount: `-${i + 1}.00`,
+      memo: `Compra ${i}`,
+    }));
+    const file = statement({ start: '20260801000000', end: '20260831235959', transactions });
+
+    const result = await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(result.imported).toBe(60);
+    expect(transactionRepository.create).toHaveBeenCalledTimes(60);
+  });
+
+  it('importa normalmente quando o mês já tem mais de 50 transações', async () => {
+    transactionRepository.countByWorkspaceAndMonth.mockResolvedValue(60);
+    const file = statement({
+      start: '20260801000000',
+      end: '20260831235959',
+      transactions: [
+        { fitId: 'TX1', date: '20260805', amount: '1000.00', memo: 'Salário' },
+        { fitId: 'TX2', date: '20260810', amount: '-410.00', memo: 'Aluguel' },
+        { fitId: 'TX3', date: '20260812', amount: '-35.90', memo: 'Farmácia' },
+      ],
+    });
+
+    const result = await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(result.imported).toBe(3);
+    expect(transactionRepository.create).toHaveBeenCalledTimes(3);
+  });
+
   it('não conta novamente uma transação já existente com o mesmo FITID', async () => {
     transactionRepository.findExternalIdsByBankAccount.mockResolvedValue(['TX1']);
     const file = statement({

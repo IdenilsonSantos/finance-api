@@ -22,6 +22,7 @@ import { AuthService } from '../services/auth.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto } from '../dto/auth.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { GetUser } from '../decorators/get-user.decorator';
+import { RateLimit, RateLimitGuard } from '../../core/guards/rate-limit.guard';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -29,6 +30,8 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 5, windowMs: 60 * 60_000 })
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @ApiResponse({ status: 409, description: 'Email already in use' })
@@ -49,6 +52,8 @@ export class AuthController {
   }
 
   @Post('login')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 10, windowMs: 15 * 60_000, perEmail: true })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({ status: 200, description: 'Login successful, returns access token' })
@@ -128,6 +133,8 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 5, windowMs: 15 * 60_000, perEmail: true })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Request a password reset email' })
   @ApiResponse({ status: 204, description: 'If the email exists, a reset link was sent' })
@@ -136,6 +143,8 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 10, windowMs: 15 * 60_000 })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Reset password using token from email' })
   @ApiResponse({ status: 204, description: 'Password reset successfully' })
@@ -146,6 +155,8 @@ export class AuthController {
   }
 
   @Post('verify-email')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 10, windowMs: 15 * 60_000 })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Verify email address using token from email' })
   @ApiResponse({ status: 204, description: 'Email verified successfully' })
@@ -155,7 +166,8 @@ export class AuthController {
     return this.authService.verifyEmail(dto.token);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 3, windowMs: 15 * 60_000 })
   @Post('resend-verification')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth('access-token')

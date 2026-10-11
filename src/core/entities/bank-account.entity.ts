@@ -1,4 +1,12 @@
-export type BankAccountType = 'checking' | 'savings' | 'investment' | 'cash';
+export type BankAccountType = 'checking' | 'savings' | 'investment' | 'cash' | 'credit_card';
+
+export const BANK_ACCOUNT_TYPES: BankAccountType[] = [
+  'checking',
+  'savings',
+  'investment',
+  'cash',
+  'credit_card',
+];
 
 export class BankAccountEntity {
   id: string;
@@ -9,6 +17,13 @@ export class BankAccountEntity {
   balance: number;
   /** Data até a qual `balance` está confirmado por um extrato importado (nulo se nunca importou). */
   balanceAsOf: string | null;
+  /** Cartão de crédito: limite em centavos. */
+  creditLimit: number | null;
+  /** Cartão de crédito: dia do fechamento da fatura (1-31). */
+  closingDay: number | null;
+  /** Cartão de crédito: dia do vencimento da fatura (1-31). */
+  dueDay: number | null;
+  archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 

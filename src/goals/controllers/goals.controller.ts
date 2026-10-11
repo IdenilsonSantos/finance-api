@@ -103,8 +103,24 @@ export class GoalsController {
   contribute(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
     @Body() dto: ContributeGoalDto,
   ) {
-    return this.goalsService.contribute(id, workspaceId, dto);
+    return this.goalsService.contribute(id, workspaceId, dto, userId);
+  }
+
+  @Post(':id/withdraw')
+  @ApiOperation({ summary: 'Withdraw part of the amount saved in a goal' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 201, description: 'Withdrawal registered' })
+  @ApiResponse({ status: 400, description: 'Amount greater than the saved amount' })
+  @ApiResponse({ status: 404, description: 'Goal not found' })
+  withdraw(
+    @WorkspaceId() workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
+    @Body() dto: ContributeGoalDto,
+  ) {
+    return this.goalsService.withdraw(id, workspaceId, dto, userId);
   }
 }

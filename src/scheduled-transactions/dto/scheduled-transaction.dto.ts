@@ -6,6 +6,7 @@ import {
   IsDateString,
   IsUUID,
   IsOptional,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { TransactionType } from '../../core/entities/transaction.entity';
@@ -66,6 +67,11 @@ export class CreateScheduledTransactionDto {
 }
 
 export class UpdateScheduledTransactionDto {
+  @ApiPropertyOptional({ example: 'uuid-da-conta', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  bankAccountId?: string;
+
   @ApiPropertyOptional({ example: 2000.0 })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'amount must be a number with up to 2 decimal places' })
@@ -97,8 +103,9 @@ export class UpdateScheduledTransactionDto {
   @IsDateString()
   nextDate?: string;
 
-  @ApiPropertyOptional({ example: '2026-12-31' })
+  @ApiPropertyOptional({ example: '2026-12-31', nullable: true, description: 'null remove a data de término' })
   @IsOptional()
+  @ValidateIf((o) => o.endDate !== null)
   @IsDateString()
-  endDate?: string;
+  endDate?: string | null;
 }

@@ -13,6 +13,8 @@ export class ScheduledTransactionEntity {
   frequency: ScheduledTransactionFrequency;
   nextDate: string; // ISO date string: YYYY-MM-DD
   endDate: string | null;
+  /** Dia âncora de recorrências mensais/anuais (null = usa o dia de nextDate). */
+  dayOfMonth: number | null;
   createdAt: Date;
   updatedAt: Date;
 

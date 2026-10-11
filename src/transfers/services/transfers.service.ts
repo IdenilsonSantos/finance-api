@@ -12,6 +12,7 @@ import { ActivityService } from '../../activity/activity.service';
 import { CreateTransferDto, ListTransfersDto } from '../dto/transfer.dto';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
+import { assertAccountActive } from '../../core/utils/accounts';
 
 @Injectable()
 export class TransfersService {
@@ -39,6 +40,8 @@ export class TransfersService {
 
     if (!fromAccount) throw new NotFoundException('Conta de origem não encontrada');
     if (!toAccount) throw new NotFoundException('Conta de destino não encontrada');
+    assertAccountActive(fromAccount);
+    assertAccountActive(toAccount);
 
     const amountInCents = Math.round(dto.amount * 100);
 
@@ -107,6 +110,11 @@ export class TransfersService {
 
   async remove(id: string, workspaceId: string, userId: string) {
     const transfer = await this.findOne(id, workspaceId);
+    const accounts = await Promise.all([
+      this.bankAccountRepository.findById(transfer.fromAccountId, workspaceId),
+      this.bankAccountRepository.findById(transfer.toAccountId, workspaceId),
+    ]);
+    accounts.forEach((a) => a && assertAccountActive(a));
 
     await this.db.transaction(async (trx) => {
       await this.transferRepository.delete(id, workspaceId, trx);

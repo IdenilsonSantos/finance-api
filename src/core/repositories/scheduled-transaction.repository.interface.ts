@@ -15,6 +15,17 @@ export interface IScheduledTransactionRepository {
   findById(id: string, workspaceId: string): Promise<ScheduledTransactionEntity | null>;
   findAllByWorkspace(workspaceId: string, filters: ListScheduledTransactionsFilters): Promise<PaginatedResult<ScheduledTransactionEntity>>;
   findDue(upToDate: string): Promise<ScheduledTransactionEntity[]>;
+  /**
+   * Reivindica atomicamente a ocorrência `expectedNextDate`: avança para
+   * `newNextDate` (ou remove o agendamento, se null). Retorna false se outra
+   * execução (cron ou manual) já a processou — evita lançamento em dobro.
+   */
+  claimOccurrence(
+    id: string,
+    expectedNextDate: string,
+    newNextDate: string | null,
+    trx: any,
+  ): Promise<boolean>;
   create(data: Partial<ScheduledTransactionEntity>, trx?: any): Promise<ScheduledTransactionEntity>;
   update(
     id: string,

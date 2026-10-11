@@ -21,7 +21,13 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { TransactionsService } from '../services/transactions.service';
-import { CreateTransactionDto, UpdateTransactionDto, ListTransactionsDto } from '../dto/transaction.dto';
+import {
+  CreateTransactionDto,
+  UpdateTransactionDto,
+  ListTransactionsDto,
+  TransactionsSummaryDto,
+  DeleteTransactionQueryDto,
+} from '../dto/transaction.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
@@ -60,6 +66,14 @@ export class TransactionsController {
     return this.transactionsService.findAll(workspaceId, query);
   }
 
+  // Deve vir ANTES de /:id
+  @Get('summary')
+  @ApiOperation({ summary: 'Income/expense totals for a period (excludes balance adjustments)' })
+  @ApiResponse({ status: 200, description: 'Period summary returned' })
+  summary(@WorkspaceId() workspaceId: string, @Query() query: TransactionsSummaryDto) {
+    return this.transactionsService.summary(workspaceId, query);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get transaction by ID' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -88,15 +102,17 @@ export class TransactionsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a transaction' })
+  @ApiOperation({ summary: 'Delete a transaction (or all installments of a purchase)' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiQuery({ name: 'scope', required: false, enum: ['single', 'installments'] })
   @ApiResponse({ status: 204, description: 'Transaction deleted' })
   @ApiResponse({ status: 404, description: 'Transaction not found' })
   remove(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @GetUser('userId') userId: string,
+    @Query() query: DeleteTransactionQueryDto,
   ) {
-    return this.transactionsService.remove(id, workspaceId, userId);
+    return this.transactionsService.remove(id, workspaceId, userId, query.scope);
   }
 }

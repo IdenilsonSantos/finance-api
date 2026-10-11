@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import { IGoalRepository } from '../../core/repositories/goal.repository.interface';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { ActivityService } from '../../activity/activity.service';
@@ -83,16 +83,30 @@ export class GoalsService {
     });
   }
 
-  async contribute(id: string, workspaceId: string, dto: ContributeGoalDto) {
+  /**
+   * Aporte na meta. Não trunca no valor alvo (o excedente fica guardado, como
+   * nas "caixinhas" dos bancos) e só notifica quando o aporte cruza a meta.
+   */
+  async contribute(id: string, workspaceId: string, dto: ContributeGoalDto, userId: string) {
     const goal = await this.findOne(id, workspaceId);
     const delta = Math.round(dto.amount * 100);
-    const newAmount = Math.min(goal.currentAmount + delta, goal.targetAmount);
 
-    const updated = await this.goalRepository.update(id, workspaceId, {
-      currentAmount: newAmount,
+    const updated = await this.goalRepository.adjustCurrentAmount(id, workspaceId, delta);
+    if (!updated) throw new NotFoundException('Meta não encontrada');
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'goal.contributed',
+      entityType: 'goal',
+      entityId: id,
+      metadata: { name: updated.name, amount: delta },
     });
 
-    if (updated.currentAmount >= updated.targetAmount) {
+    const crossedTarget =
+      goal.currentAmount < goal.targetAmount && updated.currentAmount >= updated.targetAmount;
+
+    if (crossedTarget) {
       const amount = (updated.targetAmount / 100).toLocaleString('pt-BR', {
         style: 'currency',
         currency: 'BRL',
@@ -112,6 +126,31 @@ export class GoalsService {
           }),
       );
     }
+
+    return updated;
+  }
+
+  /** Resgate de valor guardado na meta. */
+  async withdraw(id: string, workspaceId: string, dto: ContributeGoalDto, userId: string) {
+    const goal = await this.findOne(id, workspaceId);
+    const delta = Math.round(dto.amount * 100);
+    if (delta > goal.currentAmount) {
+      throw new BadRequestException('O valor do resgate é maior que o valor guardado na meta');
+    }
+
+    const updated = await this.goalRepository.adjustCurrentAmount(id, workspaceId, -delta);
+    if (!updated) {
+      throw new BadRequestException('O valor do resgate é maior que o valor guardado na meta');
+    }
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'goal.withdrawn',
+      entityType: 'goal',
+      entityId: id,
+      metadata: { name: updated.name, amount: delta },
+    });
 
     return updated;
   }

@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
@@ -19,7 +19,7 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Dashboard stats returned' })
   getDashboard(
     @WorkspaceId() workspaceId: string,
-    @Query('accountId') accountId?: string,
+    @Query('accountId', new ParseUUIDPipe({ optional: true })) accountId?: string,
     @Query('category') category?: string,
   ) {
     return this.dashboardService.getDashboard(workspaceId, {

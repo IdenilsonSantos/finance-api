@@ -1,10 +1,15 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte, sum } from 'drizzle-orm';
+import { eq, and, gte, lte, sum, ne } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { BudgetEntity, BudgetSummaryItem } from '../../../../core/entities/budget.entity';
 import { IBudgetRepository } from '../../../../core/repositories/budget.repository.interface';
+import { ADJUSTMENT_CATEGORY } from '../../../../core/entities/transaction.entity';
+import { monthEndISO } from '../../../../core/utils/date';
+
+/** Categoria do orçamento global do mês (teto de todas as despesas). */
+export const GLOBAL_BUDGET_CATEGORY = 'all';
 
 @Injectable()
 export class DrizzleBudgetRepository implements IBudgetRepository {
@@ -34,9 +39,8 @@ export class DrizzleBudgetRepository implements IBudgetRepository {
   }
 
   async getSummary(workspaceId: string, month: string): Promise<BudgetSummaryItem[]> {
-    const [year, mm] = month.split('-').map(Number);
     const startDate = `${month}-01`;
-    const endDate = new Date(year, mm, 0).toISOString().slice(0, 10);
+    const endDate = monthEndISO(month);
 
     const budgets = await this.db.query.budget.findMany({
       where: and(
@@ -56,16 +60,20 @@ export class DrizzleBudgetRepository implements IBudgetRepository {
         and(
           eq(schema.transaction.workspaceId, workspaceId),
           eq(schema.transaction.type, 'expense'),
+          ne(schema.transaction.category, ADJUSTMENT_CATEGORY),
           gte(schema.transaction.date, startDate),
           lte(schema.transaction.date, endDate),
         ),
       )
       .groupBy(schema.transaction.category);
 
+    const totalSpent = spending.reduce((acc, s) => acc + Number(s.spent ?? 0), 0);
+
     return budgets.map((b) => {
-      const spentAmount = Number(
-        spending.find((s) => s.category === b.category)?.spent ?? 0,
-      );
+      const spentAmount =
+        b.category === GLOBAL_BUDGET_CATEGORY
+          ? totalSpent
+          : Number(spending.find((s) => s.category === b.category)?.spent ?? 0);
       return {
         id: b.id,
         category: b.category,
