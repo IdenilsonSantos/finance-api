@@ -271,8 +271,8 @@ export function transferCreatedTemplate(params: {
     ${heading('Transferência realizada')}
     ${subtext(`Uma transferência entre suas contas foi concluída com sucesso.`)}
     ${infoCard([
-      { label: 'De', value: params.fromAccount },
-      { label: 'Para', value: params.toAccount },
+      { label: 'De', value: escapeHtml(params.fromAccount) },
+      { label: 'Para', value: escapeHtml(params.toAccount) },
       { label: 'Valor', value: params.amount },
       { label: 'Data', value: params.date },
     ])}
@@ -297,7 +297,7 @@ export function scheduledTransactionExecutedTemplate(params: {
     ${heading('Transação agendada executada')}
     ${subtext(`Sua transação agendada foi processada automaticamente.`)}
     ${infoCard([
-      { label: 'Descrição', value: params.description },
+      { label: 'Descrição', value: escapeHtml(params.description) },
       { label: 'Tipo', value: typeLabel },
       { label: 'Valor', value: `<span style="color:${typeColor};font-weight:700;">${isIncome ? '+' : '-'}${params.amount}</span>` },
       { label: 'Data', value: params.date },
@@ -313,9 +313,9 @@ export function goalCompletedTemplate(params: {
   return layout(`
     ${badge('#065F46', '#D1FAE5', '🎯', 'Meta atingida')}
     ${heading(`Parabéns! Você atingiu sua meta.`)}
-    ${subtext(`Você alcançou o valor alvo da meta <strong style="color:#111827;">${params.goalName}</strong>. Continue assim!`)}
+    ${subtext(`Você alcançou o valor alvo da meta <strong style="color:#111827;">${escapeHtml(params.goalName)}</strong>. Continue assim!`)}
     ${infoCard([
-      { label: 'Meta', value: params.goalName },
+      { label: 'Meta', value: escapeHtml(params.goalName) },
       { label: 'Valor alcançado', value: `<span style="color:#065F46;font-weight:700;">${params.targetAmount}</span>` },
     ])}
     ${ctaButton('Ver minhas metas', `${BASE_URL}/goals`)}
@@ -347,10 +347,10 @@ export function goalDeadlineReminderTemplate(params: {
   return layout(`
     ${badge('#92400E', '#FEF3C7', '⏰', 'Prazo se aproximando')}
     ${heading(`Sua meta vence em breve`)}
-    ${subtext(`A meta <strong style="color:#111827;">${params.goalName}</strong> está próxima do prazo. Confira seu progresso.`)}
+    ${subtext(`A meta <strong style="color:#111827;">${escapeHtml(params.goalName)}</strong> está próxima do prazo. Confira seu progresso.`)}
     ${progressBar}
     ${infoCard([
-      { label: 'Meta', value: params.goalName },
+      { label: 'Meta', value: escapeHtml(params.goalName) },
       { label: 'Prazo', value: params.deadline },
       { label: 'Valor alvo', value: params.targetAmount },
       { label: 'Valor atual', value: params.currentAmount },
@@ -367,7 +367,7 @@ export function workspaceInviteTemplate(params: {
   return layout(`
     ${badge('#4F46E5', '#EEF2FF', '✉', 'Convite')}
     ${heading('Você foi convidado!')}
-    ${subtext(`<strong style="color:#111827;">${params.inviterName}</strong> convidou você para colaborar no workspace <strong style="color:#111827;">${params.workspaceName}</strong>.`)}
+    ${subtext(`<strong style="color:#111827;">${escapeHtml(params.inviterName)}</strong> convidou você para colaborar no workspace <strong style="color:#111827;">${escapeHtml(params.workspaceName)}</strong>.`)}
     ${ctaButton('Aceitar convite', params.acceptUrl)}
     <p style="margin:20px 0 0;font-size:12px;color:#9CA3AF;text-align:center;">Link válido por 7 dias.</p>
   `);
@@ -420,8 +420,8 @@ export function budgetAlertTemplate(params: {
     </div>`;
 
   const message = isExceeded
-    ? `O orçamento da categoria <strong style="color:#111827;">${params.category}</strong> foi esgotado em <strong>${params.month}</strong>.`
-    : `O orçamento da categoria <strong style="color:#111827;">${params.category}</strong> atingiu ${params.percent}% em <strong>${params.month}</strong>.`;
+    ? `O orçamento da categoria <strong style="color:#111827;">${escapeHtml(params.category)}</strong> foi esgotado em <strong>${params.month}</strong>.`
+    : `O orçamento da categoria <strong style="color:#111827;">${escapeHtml(params.category)}</strong> atingiu ${params.percent}% em <strong>${params.month}</strong>.`;
 
   return layout(`
     ${badge(badgeColor, badgeBg, badgeIcon, badgeText)}
@@ -429,7 +429,7 @@ export function budgetAlertTemplate(params: {
     ${subtext(message)}
     ${progressBar}
     ${infoCard([
-      { label: 'Categoria', value: params.category },
+      { label: 'Categoria', value: escapeHtml(params.category) },
       { label: 'Mês', value: params.month },
       { label: 'Gasto', value: `<span style="color:${barColor};font-weight:700;">${params.spentAmount}</span>` },
       { label: 'Orçamento', value: params.budgetAmount },
