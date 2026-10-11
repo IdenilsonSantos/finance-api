@@ -56,13 +56,14 @@ function formatAmount(cents: number, type: 'income' | 'expense'): string {
 export function buildTransactionsCsv(
   transactions: TransactionEntity[],
   accountNames: Map<string, string>,
+  labelOf: (category: string) => string = categoryLabel,
 ): string {
   const lines = transactions.map((t) =>
     [
       formatDate(t.date),
       csvField(t.description),
       csvField(t.beneficiary),
-      csvField(categoryLabel(t.category)),
+      csvField(labelOf(t.category)),
       t.type === 'income' ? 'Receita' : 'Despesa',
       // Número gerado aqui: fica sem a proteção de fórmula para continuar numérico.
       formatAmount(t.amount, t.type),

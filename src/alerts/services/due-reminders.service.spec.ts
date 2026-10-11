@@ -64,7 +64,7 @@ describe('DueRemindersService.handleBillReminders', () => {
   it('envia um lembrete por workspace', async () => {
     jest.spyOn(dateUtils, 'todayISO').mockReturnValue('2024-03-10');
     const notifications = { notifyWorkspace: jest.fn().mockResolvedValue(undefined), sendBillsReminder: jest.fn() };
-    const service = new DueRemindersService({} as any, notifications as any, {} as any);
+    const service = new DueRemindersService({} as any, notifications as any, {} as any, { labelResolver: jest.fn().mockResolvedValue((k: string) => k) } as any);
     const find = jest
       .spyOn(service as any, 'findPendingBills')
       .mockResolvedValue([bill({}), bill({ description: 'Luz' }), bill({ workspaceId: 'ws-2' })]);
@@ -107,7 +107,7 @@ describe('DueRemindersService.handleInvoiceReminders', () => {
     jest.spyOn(dateUtils, 'todayISO').mockReturnValue('2024-03-05');
     const notifications = { notifyWorkspace: jest.fn().mockResolvedValue(undefined), sendInvoiceDue: jest.fn() };
     const bankAccounts = { getInvoice: jest.fn().mockResolvedValue(invoice) };
-    const service = new DueRemindersService({} as any, notifications as any, bankAccounts as any);
+    const service = new DueRemindersService({} as any, notifications as any, bankAccounts as any, { labelResolver: jest.fn().mockResolvedValue((k: string) => k) } as any);
     jest.spyOn(service as any, 'findActiveCards').mockResolvedValue([
       { id: 'card-1', workspaceId: 'ws-1', name: 'Nubank', closingDay: 25, dueDay: 5 },
     ]);

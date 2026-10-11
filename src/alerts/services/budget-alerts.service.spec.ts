@@ -23,7 +23,12 @@ describe('BudgetAlertsService', () => {
       notifyWorkspace: jest.fn().mockResolvedValue(undefined),
       sendBudgetAlert: jest.fn(),
     };
-    service = new BudgetAlertsService({} as any, notifications);
+    const categories = {
+      labelResolver: jest.fn().mockResolvedValue((key: string) =>
+        ({ food: 'Alimentação', all: 'Total do mês', 'cat-1': 'Pets' })[key] ?? key,
+      ),
+    };
+    service = new BudgetAlertsService({} as any, notifications, categories as any);
   });
 
   function stub(budgets: any[], spending: Record<string, number>) {
@@ -40,6 +45,19 @@ describe('BudgetAlertsService', () => {
       'ws-1',
       'budgetAlert',
       expect.objectContaining({ title: 'Orçamento de Alimentação em 85%' }),
+      expect.any(Function),
+    );
+  });
+
+  it('usa o nome da categoria personalizada', async () => {
+    stub([{ id: 'b2', category: 'cat-1', amount: 10000, month: '2024-03' }], { 'cat-1': 12000 });
+
+    await service.checkThresholds('ws-1', [{ month: '2024-03', category: 'cat-1', delta: 5000 }]);
+
+    expect(notifications.notifyWorkspace).toHaveBeenCalledWith(
+      'ws-1',
+      'budgetAlert',
+      expect.objectContaining({ title: 'Orçamento de Pets estourado' }),
       expect.any(Function),
     );
   });

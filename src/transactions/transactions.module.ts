@@ -3,6 +3,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { BankAccountsModule } from '../bank-accounts/bank-accounts.module';
 import { ActivityModule } from '../activity/activity.module';
 import { AlertsModule } from '../alerts/alerts.module';
+import { CategoriesModule } from '../categories/categories.module';
 import { TransactionsService } from './services/transactions.service';
 import { TransactionsController } from './controllers/transactions.controller';
 import { WorkspaceGuard } from '../workspaces/guards/workspace.guard';
@@ -12,7 +13,7 @@ import { ITransferRepository } from '../core/repositories/transfer.repository.in
 import { DrizzleTransferRepository } from '../infrastructure/database/drizzle/repositories/drizzle-transfer.repository';
 
 @Module({
-  imports: [WorkspacesModule, BankAccountsModule, ActivityModule, AlertsModule],
+  imports: [WorkspacesModule, BankAccountsModule, ActivityModule, AlertsModule, CategoriesModule],
   providers: [
     TransactionsService,
     WorkspaceGuard,
