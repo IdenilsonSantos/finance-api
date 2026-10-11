@@ -33,12 +33,13 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
     workspaceId: string,
     filters: ListTransactionsFilters,
   ): Promise<PaginatedResult<TransactionEntity>> {
-    const { page, limit, type, category, accountId, startDate, endDate, search } = filters;
+    const { page, limit, type, category, accountId, startDate, endDate, search, status } = filters;
     const { limit: lim, offset } = paginate(page, limit);
 
     const conditions: SQL[] = [eq(schema.transaction.workspaceId, workspaceId)];
 
     if (type) conditions.push(eq(schema.transaction.type, type));
+    if (status) conditions.push(eq(schema.transaction.status, status));
     if (category) conditions.push(eq(schema.transaction.category, category));
     if (accountId) conditions.push(eq(schema.transaction.bankAccountId, accountId));
     if (startDate) conditions.push(gte(schema.transaction.date, startDate));
@@ -105,12 +106,17 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
     if (filters.endDate) conditions.push(lte(schema.transaction.date, filters.endDate));
     const where = and(...conditions);
 
+    const t = schema.transaction;
     const [totals] = await this.db
       .select({
-        income: sql<string>`coalesce(sum(${schema.transaction.amount}) filter (where ${schema.transaction.type} = 'income'), 0)`,
-        expense: sql<string>`coalesce(sum(${schema.transaction.amount}) filter (where ${schema.transaction.type} = 'expense'), 0)`,
-        incomeCount: sql<string>`count(*) filter (where ${schema.transaction.type} = 'income')`,
-        expenseCount: sql<string>`count(*) filter (where ${schema.transaction.type} = 'expense')`,
+        income: sql<string>`coalesce(sum(${t.amount}) filter (where ${t.type} = 'income' and ${t.status} = 'paid'), 0)`,
+        expense: sql<string>`coalesce(sum(${t.amount}) filter (where ${t.type} = 'expense' and ${t.status} = 'paid'), 0)`,
+        incomeCount: sql<string>`count(*) filter (where ${t.type} = 'income' and ${t.status} = 'paid')`,
+        expenseCount: sql<string>`count(*) filter (where ${t.type} = 'expense' and ${t.status} = 'paid')`,
+        pendingIncome: sql<string>`coalesce(sum(${t.amount}) filter (where ${t.type} = 'income' and ${t.status} = 'pending'), 0)`,
+        pendingExpense: sql<string>`coalesce(sum(${t.amount}) filter (where ${t.type} = 'expense' and ${t.status} = 'pending'), 0)`,
+        pendingCount: sql<string>`count(*) filter (where ${t.status} = 'pending')`,
+        overdueCount: sql<string>`count(*) filter (where ${t.status} = 'pending' and ${t.date} < ${filters.today})`,
       })
       .from(schema.transaction)
       .where(and(where, ne(schema.transaction.category, ADJUSTMENT_CATEGORY)));
@@ -130,6 +136,10 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
       balance: income - expense,
       incomeCount: Number(totals?.incomeCount ?? 0),
       expenseCount: Number(totals?.expenseCount ?? 0),
+      pendingIncome: Number(totals?.pendingIncome ?? 0),
+      pendingExpense: Number(totals?.pendingExpense ?? 0),
+      pendingCount: Number(totals?.pendingCount ?? 0),
+      overdueCount: Number(totals?.overdueCount ?? 0),
       activeDates: dates.map((d) => d.date),
     };
   }
@@ -218,6 +228,7 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
       .where(
         and(
           eq(schema.transaction.bankAccountId, bankAccountId),
+          eq(schema.transaction.status, 'paid'),
           lte(schema.transaction.date, asOfDate),
         ),
       );

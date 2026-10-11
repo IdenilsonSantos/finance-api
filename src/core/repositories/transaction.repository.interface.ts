@@ -1,5 +1,5 @@
 import { TransactionEntity } from '../entities/transaction.entity';
-import type { TransactionType } from '../entities/transaction.entity';
+import type { TransactionStatus, TransactionType } from '../entities/transaction.entity';
 import { PaginatedResult } from '../dto/pagination.dto';
 
 export const ITransactionRepository = Symbol('ITransactionRepository');
@@ -13,20 +13,32 @@ export interface ListTransactionsFilters {
   startDate?: string;
   endDate?: string;
   search?: string;
+  status?: TransactionStatus;
 }
 
 export interface TransactionsSummaryFilters {
   startDate?: string;
   endDate?: string;
   accountId?: string;
+  /** Data de hoje (YYYY-MM-DD), para contar pendências vencidas. */
+  today: string;
 }
 
 export interface TransactionsSummary {
+  /** Receitas efetivadas no período. */
   income: number;
+  /** Despesas efetivadas no período. */
   expense: number;
   balance: number;
   incomeCount: number;
   expenseCount: number;
+  /** Receitas pendentes (a receber) no período. */
+  pendingIncome: number;
+  /** Despesas pendentes (a pagar) no período. */
+  pendingExpense: number;
+  pendingCount: number;
+  /** Pendências com data anterior a hoje. */
+  overdueCount: number;
   /** Datas (YYYY-MM-DD) com ao menos uma movimentação no período. */
   activeDates: string[];
 }
@@ -53,7 +65,7 @@ export interface ITransactionRepository {
   ): Promise<TransactionEntity[]>;
   /**
    * Saldo de uma conta até `asOfDate` (inclusive) reconstruído pelo histórico:
-   * transações (entradas - saídas) + transferências recebidas - enviadas.
+   * transações efetivadas (entradas - saídas) + transferências recebidas - enviadas.
    * Usado para conciliar com o saldo informado pelo banco.
    */
   sumBalanceByBankAccountUpToDate(

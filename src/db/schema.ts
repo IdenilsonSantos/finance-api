@@ -101,6 +101,8 @@ export const transaction = pgTable('transaction', {
   category: text('category').notNull(),
   paymentMethod: text('paymentMethod'),
   date: date('date').notNull(),
+  // "pending" = conta a pagar/receber: não altera o saldo até ser efetivada.
+  status: text('status', { enum: ['paid', 'pending'] }).notNull().default('paid'),
   externalId: text('externalId'), // FITID do OFX para deduplicação
   // Compras parceladas no cartão: todas as parcelas compartilham o grupo.
   installmentGroupId: uuid('installmentGroupId'),
