@@ -6,6 +6,7 @@ import { ptBR } from 'date-fns/locale';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, gte, lte, lt, desc, count, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/database.module';
+import { APP_TIMEZONE, parseISODate, toISODate, todayISO } from '../../core/utils/date';
 import * as schema from '../../db/schema';
 import {
   DEFAULT_PREFS,
@@ -231,10 +232,10 @@ export class NotificationsService {
     }
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_8AM)
+  @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: APP_TIMEZONE })
   async handleGoalDeadlineReminders(): Promise<void> {
-    const today = new Date().toISOString().slice(0, 10);
-    const in7days = addDays(new Date(), 7).toISOString().slice(0, 10);
+    const today = todayISO();
+    const in7days = toISODate(addDays(parseISODate(today), 7));
 
     const goals = await this.db
       .select({
