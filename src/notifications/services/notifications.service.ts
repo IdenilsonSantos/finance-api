@@ -193,43 +193,42 @@ export class NotificationsService {
     return merged;
   }
 
+  /**
+   * Notifica todos os membros do workspace (as finanças são compartilhadas).
+   * A notificação no app é sempre criada; o e-mail segue a preferência de
+   * cada membro.
+   */
   async notifyWorkspace(
     workspaceId: string,
     pref: keyof NotifPrefs,
     notification: { title: string; body: string },
     emailSend: (email: string) => Promise<void>,
   ): Promise<void> {
-    const ws = await this.db
-      .select({ ownerId: schema.workspace.ownerId })
-      .from(schema.workspace)
-      .where(eq(schema.workspace.id, workspaceId))
-      .limit(1)
-      .then((r) => r[0]);
+    const members = await this.workspaceRecipients(workspaceId);
 
-    if (!ws) return;
+    for (const member of members) {
+      await this.createNotification(
+        member.userId,
+        pref,
+        notification.title,
+        notification.body,
+      ).catch(() => {});
 
-    const owner = await this.db
-      .select({ email: schema.user.email })
-      .from(schema.user)
-      .where(eq(schema.user.id, ws.ownerId))
-      .limit(1)
-      .then((r) => r[0]);
-
-    if (!owner) return;
-
-    await this.createNotification(
-      ws.ownerId,
-      pref,
-      notification.title,
-      notification.body,
-    ).catch(() => {});
-
-    const prefs = await this.getPrefs(ws.ownerId);
-    if (prefs[pref]) {
-      await emailSend(owner.email).catch((err: unknown) => {
-        console.error('[NotificationsService] Failed to send email:', err);
-      });
+      const prefs = await this.getPrefs(member.userId);
+      if (prefs[pref]) {
+        await emailSend(member.email).catch((err: unknown) => {
+          console.error('[NotificationsService] Failed to send email:', err);
+        });
+      }
     }
+  }
+
+  private async workspaceRecipients(workspaceId: string): Promise<{ userId: string; email: string }[]> {
+    return this.db
+      .select({ userId: schema.workspaceMember.userId, email: schema.user.email })
+      .from(schema.workspaceMember)
+      .innerJoin(schema.user, eq(schema.workspaceMember.userId, schema.user.id))
+      .where(eq(schema.workspaceMember.workspaceId, workspaceId));
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: APP_TIMEZONE })
