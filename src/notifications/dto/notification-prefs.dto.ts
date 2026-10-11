@@ -21,6 +21,11 @@ export class UpdateNotificationPrefsDto {
   @IsBoolean()
   @IsOptional()
   transferCreated?: boolean;
+
+  @ApiPropertyOptional({ example: true, description: 'Orçamento chegou a 80% ou estourou' })
+  @IsBoolean()
+  @IsOptional()
+  budgetAlert?: boolean;
 }
 
 export type NotifPrefs = Required<UpdateNotificationPrefsDto>;
@@ -30,4 +35,5 @@ export const DEFAULT_PREFS: NotifPrefs = {
   goalDeadline: true,
   scheduledReminder: true,
   transferCreated: false,
+  budgetAlert: true,
 };

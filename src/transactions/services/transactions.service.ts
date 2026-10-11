@@ -1,6 +1,7 @@
 import {
   Injectable,
   Inject,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -15,15 +16,32 @@ import {
   ListTransactionsDto,
   TransactionsSummaryDto,
 } from '../dto/transaction.dto';
-import { TransactionEntity, balanceEffect } from '../../core/entities/transaction.entity';
+import {
+  ADJUSTMENT_CATEGORY,
+  TransactionEntity,
+  balanceEffect,
+} from '../../core/entities/transaction.entity';
+import { BudgetAlertsService, BudgetChange } from '../../alerts/services/budget-alerts.service';
 import { assertAccountActive } from '../../core/utils/accounts';
 import { parseISODate, toISODate, todayISO, withClampedDay } from '../../core/utils/date';
 import { ActivityService } from '../../activity/activity.service';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 
+/** Despesas (fora ajustes) viram variações de gasto por mês/categoria. */
+function budgetChanges(
+  txs: Pick<TransactionEntity, 'type' | 'category' | 'amount' | 'date'>[],
+  sign: 1 | -1,
+): BudgetChange[] {
+  return txs
+    .filter((t) => t.type === 'expense' && t.category !== ADJUSTMENT_CATEGORY)
+    .map((t) => ({ month: t.date.slice(0, 7), category: t.category, delta: sign * t.amount }));
+}
+
 @Injectable()
 export class TransactionsService {
+  private readonly logger = new Logger(TransactionsService.name);
+
   constructor(
     @Inject(ITransactionRepository)
     private readonly transactionRepository: ITransactionRepository,
@@ -31,7 +49,24 @@ export class TransactionsService {
     private readonly bankAccountRepository: IBankAccountRepository,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly activityService: ActivityService,
+    private readonly budgetAlerts: BudgetAlertsService,
   ) {}
+
+  /**
+   * Alertas de orçamento rodam depois da operação já gravada: não podem
+   * atrasar a resposta nem transformar um sucesso em erro.
+   */
+  private checkBudgets(workspaceId: string, buildChanges: () => BudgetChange[]) {
+    const fail = (err: unknown) =>
+      this.logger.error('Falha ao verificar orçamentos', err instanceof Error ? err.stack : String(err));
+    try {
+      const changes = buildChanges();
+      if (changes.length === 0) return;
+      this.budgetAlerts.checkThresholds(workspaceId, changes).catch(fail);
+    } catch (err) {
+      fail(err);
+    }
+  }
 
   async create(dto: CreateTransactionDto, workspaceId: string, userId: string) {
     const account = await this.bankAccountRepository.findById(
@@ -53,7 +88,7 @@ export class TransactionsService {
       throw new BadRequestException('Valor insuficiente para o número de parcelas');
     }
 
-    const tx = await this.db.transaction(async (trx) => {
+    const createdRows = await this.db.transaction(async (trx) => {
       const rows = this.buildInstallments({ ...data, status }, amountInCents, installments, workspaceId);
       const created: TransactionEntity[] = [];
       for (const row of rows) {
@@ -67,8 +102,10 @@ export class TransactionsService {
         await this.bankAccountRepository.updateBalance(dto.bankAccountId, delta, trx);
       }
 
-      return created[0];
+      return created;
     });
+    const tx = createdRows[0];
+    this.checkBudgets(workspaceId, () => budgetChanges(createdRows, 1));
 
     this.activityService.log({
       workspaceId,
@@ -215,6 +252,11 @@ export class TransactionsService {
       entityId: id,
       metadata: { description: updated.description, amount: updated.amount },
     });
+
+    this.checkBudgets(workspaceId, () => [
+      ...budgetChanges([old], -1),
+      ...budgetChanges([updated], 1),
+    ]);
 
     return updated;
   }

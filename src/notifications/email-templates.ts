@@ -424,6 +424,6 @@ export function budgetAlertTemplate(params: {
       { label: 'Gasto', value: `<span style="color:${barColor};font-weight:700;">${params.spentAmount}</span>` },
       { label: 'Orçamento', value: params.budgetAmount },
     ])}
-    ${ctaButton('Ver orçamentos', `${BASE_URL}/transactions`)}
+    ${ctaButton('Ver orçamentos', `${BASE_URL}/budgets`)}
   `);
 }

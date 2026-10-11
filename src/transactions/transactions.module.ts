@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { BankAccountsModule } from '../bank-accounts/bank-accounts.module';
 import { ActivityModule } from '../activity/activity.module';
+import { AlertsModule } from '../alerts/alerts.module';
 import { TransactionsService } from './services/transactions.service';
 import { TransactionsController } from './controllers/transactions.controller';
 import { WorkspaceGuard } from '../workspaces/guards/workspace.guard';
@@ -9,7 +10,7 @@ import { ITransactionRepository } from '../core/repositories/transaction.reposit
 import { DrizzleTransactionRepository } from '../infrastructure/database/drizzle/repositories/drizzle-transaction.repository';
 
 @Module({
-  imports: [WorkspacesModule, BankAccountsModule, ActivityModule],
+  imports: [WorkspacesModule, BankAccountsModule, ActivityModule, AlertsModule],
   providers: [
     TransactionsService,
     WorkspaceGuard,
