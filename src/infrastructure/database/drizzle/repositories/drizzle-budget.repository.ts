@@ -1,11 +1,11 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte, sum, ne } from 'drizzle-orm';
+import { eq, and, gte, lte, sum, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { BudgetEntity, BudgetSummaryItem } from '../../../../core/entities/budget.entity';
 import { IBudgetRepository } from '../../../../core/repositories/budget.repository.interface';
-import { ADJUSTMENT_CATEGORY } from '../../../../core/entities/transaction.entity';
+import { NON_FLOW_CATEGORIES } from '../../../../core/entities/transaction.entity';
 import { monthEndISO } from '../../../../core/utils/date';
 
 /** Categoria do orçamento global do mês (teto de todas as despesas). */
@@ -60,7 +60,7 @@ export class DrizzleBudgetRepository implements IBudgetRepository {
         and(
           eq(schema.transaction.workspaceId, workspaceId),
           eq(schema.transaction.type, 'expense'),
-          ne(schema.transaction.category, ADJUSTMENT_CATEGORY),
+          notInArray(schema.transaction.category, NON_FLOW_CATEGORIES),
           gte(schema.transaction.date, startDate),
           lte(schema.transaction.date, endDate),
         ),

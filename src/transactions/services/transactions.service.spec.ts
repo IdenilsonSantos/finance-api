@@ -249,6 +249,19 @@ describe('TransactionsService', () => {
       expect(bankAccountRepo.updateBalance).toHaveBeenCalledWith('inv-1', -51000, db);
     });
 
+    it('pagamento de fatura pode virar transferência para o cartão', async () => {
+      bankAccountRepo.findById.mockImplementation(async (id: string) => (id === 'card-1' ? card : checking));
+      transactionRepo.findById.mockResolvedValue({ ...application, description: 'Pagamento de fatura' });
+
+      await service.convertToTransfer('tx-1', 'ws-1', { counterpartAccountId: 'card-1' }, 'user-1');
+
+      expect(transferRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ fromAccountId: 'acc-1', toAccountId: 'card-1' }),
+        db,
+      );
+      expect(bankAccountRepo.updateBalance).toHaveBeenCalledWith('card-1', 175000, db);
+    });
+
     it('recusa transação pendente', async () => {
       bankAccountRepo.findById.mockResolvedValue(checking);
       transactionRepo.findById.mockResolvedValue({ ...application, status: 'pending' });

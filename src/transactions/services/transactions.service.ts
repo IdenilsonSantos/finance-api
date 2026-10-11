@@ -27,6 +27,7 @@ import {
   ADJUSTMENT_CATEGORY,
   TransactionEntity,
   balanceEffect,
+  isNonFlowCategory,
 } from '../../core/entities/transaction.entity';
 import { BudgetAlertsService, BudgetChange } from '../../alerts/services/budget-alerts.service';
 import { assertAccountActive } from '../../core/utils/accounts';
@@ -41,7 +42,7 @@ function budgetChanges(
   sign: 1 | -1,
 ): BudgetChange[] {
   return txs
-    .filter((t) => t.type === 'expense' && t.category !== ADJUSTMENT_CATEGORY)
+    .filter((t) => t.type === 'expense' && !isNonFlowCategory(t.category))
     .map((t) => ({ month: t.date.slice(0, 7), category: t.category, delta: sign * t.amount }));
 }
 
@@ -321,10 +322,9 @@ export class TransactionsService {
       }
       counterpart = await this.bankAccountRepository.findById(dto.counterpartAccountId, workspaceId);
       if (!counterpart) throw new NotFoundException('Conta de destino não encontrada');
+      // Cartão como destino = pagamento de fatura (ex.: "Pagamento de fatura"
+      // importado como despesa); como origem = "Pix no crédito".
       assertAccountActive(counterpart);
-      if (counterpart.type === 'credit_card') {
-        throw new BadRequestException('Use "Pagar fatura" para transferir para o cartão de crédito');
-      }
     }
 
     const isOutflow = tx.type === 'expense';

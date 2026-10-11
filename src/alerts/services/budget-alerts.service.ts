@@ -1,11 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { and, eq, gte, inArray, lte, ne, sum } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte, notInArray, sum } from 'drizzle-orm';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
-import { ADJUSTMENT_CATEGORY } from '../../core/entities/transaction.entity';
+import { NON_FLOW_CATEGORIES } from '../../core/entities/transaction.entity';
 import { GLOBAL_BUDGET_CATEGORY } from '../../infrastructure/database/drizzle/repositories/drizzle-budget.repository';
 import { CategoriesService, CategoryLabelResolver } from '../../categories/services/categories.service';
 import { monthEndISO } from '../../core/utils/date';
@@ -144,7 +144,7 @@ export class BudgetAlertsService {
         and(
           eq(schema.transaction.workspaceId, workspaceId),
           eq(schema.transaction.type, 'expense'),
-          ne(schema.transaction.category, ADJUSTMENT_CATEGORY),
+          notInArray(schema.transaction.category, NON_FLOW_CATEGORIES),
           gte(schema.transaction.date, `${month}-01`),
           lte(schema.transaction.date, monthEndISO(month)),
         ),

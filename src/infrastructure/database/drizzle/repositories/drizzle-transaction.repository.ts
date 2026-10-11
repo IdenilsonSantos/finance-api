@@ -1,9 +1,9 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte, lt, count, inArray, isNotNull, ilike, or, sql, SQL, asc, desc, ne } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, count, inArray, isNotNull, ilike, or, sql, SQL, asc, desc, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
-import { TransactionEntity, ADJUSTMENT_CATEGORY } from '../../../../core/entities/transaction.entity';
+import { TransactionEntity, NON_FLOW_CATEGORIES } from '../../../../core/entities/transaction.entity';
 import {
   ITransactionRepository,
   ListTransactionsFilters,
@@ -122,7 +122,7 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
         pendingCount: sql<string>`count(*) filter (where ${t.status} = 'pending')`,
       })
       .from(schema.transaction)
-      .where(and(where, ne(schema.transaction.category, ADJUSTMENT_CATEGORY)));
+      .where(and(where, notInArray(schema.transaction.category, NON_FLOW_CATEGORIES)));
 
     // Atrasadas: todas as pendências vencidas, de qualquer período (uma conta
     // de meses atrás continua atrasada mesmo olhando o mês atual).
