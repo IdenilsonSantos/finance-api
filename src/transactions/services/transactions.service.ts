@@ -135,6 +135,7 @@ export class TransactionsService {
       endDate: filters.endDate,
       search: filters.search,
       status: filters.status,
+      order: filters.order,
     });
   }
 

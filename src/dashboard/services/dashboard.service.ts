@@ -7,6 +7,7 @@ import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 import { ADJUSTMENT_CATEGORY } from '../../core/entities/transaction.entity';
 import { GLOBAL_BUDGET_CATEGORY } from '../../infrastructure/database/drizzle/repositories/drizzle-budget.repository';
+import { parseISODate, todayISO } from '../../core/utils/date';
 
 @Injectable()
 export class DashboardService {
@@ -18,12 +19,14 @@ export class DashboardService {
     workspaceId: string,
     options: { accountId?: string; category?: string } = {},
   ) {
-    const now = new Date();
+    // "Hoje" e o mês corrente no fuso do app, não no do servidor (UTC):
+    // entre 21h e meia-noite o servidor já estaria no dia seguinte.
+    const today = todayISO();
+    const now = parseISODate(today);
     const currentMonth = format(now, 'yyyy-MM');
     const monthStart = format(startOfMonth(now), 'yyyy-MM-dd');
     const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd');
     const sixMonthsAgo = format(subMonths(startOfMonth(now), 5), 'yyyy-MM-dd');
-    const today = format(now, 'yyyy-MM-dd');
 
     const txBase = [
       eq(schema.transaction.workspaceId, workspaceId),
