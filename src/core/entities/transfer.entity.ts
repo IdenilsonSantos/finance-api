@@ -6,6 +6,8 @@ export class TransferEntity {
   amount: number;
   description: string | null;
   date: string; // ISO date string: YYYY-MM-DD
+  /** FITID do extrato, quando veio de uma importação. */
+  externalId: string | null;
   createdAt: Date;
   updatedAt: Date;
 

@@ -82,6 +82,9 @@ export const bankAccount = pgTable('bankAccount', {
   // Data até a qual o saldo acima está confirmado por extrato importado
   // (LEDGERBAL). Nulo se a conta nunca teve extrato importado.
   balanceAsOf: date('balanceAsOf'),
+  // Conta de investimento criada automaticamente para receber as aplicações
+  // feitas a partir desta conta de origem (ex.: "Investimentos · Nubank").
+  linkedAccountId: uuid('linkedAccountId'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
@@ -209,6 +212,9 @@ export const transfer = pgTable('transfer', {
   amount: integer('amount').notNull(),
   description: text('description'),
   date: date('date').notNull(),
+  // FITID do extrato quando a transferência veio de uma importação (ex.:
+  // aplicação/resgate), para não duplicá-la ao reimportar.
+  externalId: text('externalId'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });

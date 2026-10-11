@@ -211,7 +211,21 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
           inArray(schema.transaction.externalId, fitIds),
         ),
       );
-    return results.map((r) => r.externalId!);
+    // Aplicações/resgates importados viram transferências: o FITID fica nelas.
+    const transfers = await this.db
+      .select({ externalId: schema.transfer.externalId })
+      .from(schema.transfer)
+      .where(
+        and(
+          or(
+            eq(schema.transfer.fromAccountId, bankAccountId),
+            eq(schema.transfer.toAccountId, bankAccountId),
+          ),
+          isNotNull(schema.transfer.externalId),
+          inArray(schema.transfer.externalId, fitIds),
+        ),
+      );
+    return [...results, ...transfers].map((r) => r.externalId!);
   }
 
   async findByBankAccountInDateRange(

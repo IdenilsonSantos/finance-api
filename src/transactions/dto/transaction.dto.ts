@@ -69,6 +69,17 @@ export class CreateTransactionDto {
   installments?: number;
 }
 
+export class ConvertToTransferDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Conta da outra ponta. Sem ela, usa (ou cria) a conta de investimento vinculada à conta da transação',
+  })
+  @IsOptional()
+  @IsUUID()
+  counterpartAccountId?: string;
+}
+
 export class DeleteTransactionQueryDto {
   @ApiPropertyOptional({
     enum: ['single', 'installments'],

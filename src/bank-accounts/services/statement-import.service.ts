@@ -14,6 +14,9 @@ import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 import { TransactionEntity, balanceEffect } from '../../core/entities/transaction.entity';
 import { assertAccountActive } from '../../core/utils/accounts';
+import { classifyInvestmentMovement } from '../../core/utils/investments';
+import { ITransferRepository } from '../../core/repositories/transfer.repository.interface';
+import { InvestmentAccountsService } from './investment-accounts.service';
 import { addDays, differenceInCalendarDays } from 'date-fns';
 import { parseISODate, toISODate } from '../../core/utils/date';
 
@@ -29,6 +32,10 @@ export interface ImportResult {
   duplicates: number;
   /** Contas pendentes que apareceram pagas no extrato e foram efetivadas. */
   settled?: number;
+  /** Aplicações/resgates registrados como transferência (não como despesa/receita). */
+  investmentTransfers?: number;
+  /** Conta de investimento que recebeu as aplicações/resgates. */
+  investmentAccountName?: string;
   total: number;
   accountCreated?: boolean;
   accountName?: string;
@@ -75,6 +82,9 @@ export class StatementImportService {
     @Inject(ITransactionRepository)
     private readonly transactionRepository: ITransactionRepository,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
+    private readonly investmentAccounts: InvestmentAccountsService,
+    @Inject(ITransferRepository)
+    private readonly transferRepository: ITransferRepository,
   ) {}
 
   async importOFX(
@@ -347,11 +357,48 @@ export class StatementImportService {
 
     const shouldAdjust = adjustToBankBalance && !!divergence && divergence !== 0;
 
+    // Aplicações e resgates de investimento viram transferências para a conta
+    // de investimento vinculada (não são despesa/receita). Cartão não tem.
+    const sourceAccount = await this.bankAccountRepository.findById(resolvedAccountId, workspaceId);
+    const movements = new Map(
+      sourceAccount && sourceAccount.type !== 'credit_card'
+        ? newTransactions
+            .map((t) => [t.fitId, classifyInvestmentMovement(t.description, t.type)] as const)
+            .filter(([, kind]) => kind !== null)
+        : [],
+    );
+    let investmentAccountName: string | undefined;
+
     // Insere em lote dentro de uma única transação de banco
     await this.db.transaction(async (trx) => {
       let totalDelta = 0;
+      let investmentDelta = 0;
+      const investment =
+        movements.size > 0 && sourceAccount
+          ? await this.investmentAccounts.findOrCreate(sourceAccount, trx)
+          : null;
+      investmentAccountName = investment?.name;
 
       for (const t of newTransactions) {
+        if (investment && movements.has(t.fitId)) {
+          const isDeposit = movements.get(t.fitId) === 'deposit';
+          await this.transferRepository.create(
+            {
+              workspaceId,
+              fromAccountId: isDeposit ? resolvedAccountId : investment.id,
+              toAccountId: isDeposit ? investment.id : resolvedAccountId,
+              amount: t.amountInCents,
+              description: t.description,
+              date: t.date,
+              externalId: t.fitId,
+            },
+            trx,
+          );
+          totalDelta += isDeposit ? -t.amountInCents : t.amountInCents;
+          investmentDelta += isDeposit ? t.amountInCents : -t.amountInCents;
+          continue;
+        }
+
         await this.transactionRepository.create(
           {
             workspaceId,
@@ -366,6 +413,10 @@ export class StatementImportService {
           trx,
         );
         totalDelta += t.type === 'income' ? t.amountInCents : -t.amountInCents;
+      }
+
+      if (investment && investmentDelta !== 0) {
+        await this.bankAccountRepository.updateBalance(investment.id, investmentDelta, trx);
       }
 
       for (const { tx, fitId, date } of toSettle) {
@@ -443,6 +494,8 @@ export class StatementImportService {
       imported: newTransactions.length,
       duplicates,
       settled: toSettle.length,
+      investmentTransfers: investmentAccountName ? movements.size : 0,
+      investmentAccountName,
       total: parsed.length,
       accountCreated,
       accountName: accountCreated ? (accountInfo?.name ?? 'Conta Importada') : undefined,

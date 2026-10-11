@@ -10,11 +10,15 @@ import { addMonths } from 'date-fns';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
+import { ITransferRepository } from '../../core/repositories/transfer.repository.interface';
+import { BankAccountEntity } from '../../core/entities/bank-account.entity';
+import { InvestmentAccountsService } from '../../bank-accounts/services/investment-accounts.service';
 import {
   CreateTransactionDto,
   UpdateTransactionDto,
   ListTransactionsDto,
   TransactionsSummaryDto,
+  ConvertToTransferDto,
 } from '../dto/transaction.dto';
 import {
   ADJUSTMENT_CATEGORY,
@@ -50,6 +54,9 @@ export class TransactionsService {
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly activityService: ActivityService,
     private readonly budgetAlerts: BudgetAlertsService,
+    private readonly investmentAccounts: InvestmentAccountsService,
+    @Inject(ITransferRepository)
+    private readonly transferRepository: ITransferRepository,
   ) {}
 
   /**
@@ -260,6 +267,77 @@ export class TransactionsService {
     ]);
 
     return updated;
+  }
+
+  /**
+   * Converte uma transação em transferência — ex.: "Aplicação RDB" importada
+   * como despesa. Despesa vira saída para a outra conta; receita vira entrada
+   * vinda dela. O saldo da conta da transação não muda (o valor já tinha
+   * saído/entrado); só a outra ponta recebe o movimento. Sem conta informada,
+   * usa a conta de investimento vinculada (criada se preciso).
+   */
+  async convertToTransfer(id: string, workspaceId: string, dto: ConvertToTransferDto, userId: string) {
+    const tx = await this.findOne(id, workspaceId);
+    const account = await this.bankAccountRepository.findById(tx.bankAccountId, workspaceId);
+    if (!account) throw new NotFoundException('Conta bancária não encontrada');
+    assertAccountActive(account);
+
+    if (account.type === 'credit_card') {
+      throw new BadRequestException('Lançamentos do cartão de crédito não podem virar transferência');
+    }
+    if (tx.status !== 'paid') {
+      throw new BadRequestException('Marque a transação como paga antes de convertê-la em transferência');
+    }
+    if (tx.category === ADJUSTMENT_CATEGORY) {
+      throw new BadRequestException('Ajustes de saldo não podem virar transferência');
+    }
+    if (tx.installmentGroupId) {
+      throw new BadRequestException('Compras parceladas não podem virar transferência');
+    }
+
+    let counterpart: BankAccountEntity | null = null;
+    if (dto.counterpartAccountId) {
+      if (dto.counterpartAccountId === account.id) {
+        throw new BadRequestException('Escolha uma conta diferente da conta da transação');
+      }
+      counterpart = await this.bankAccountRepository.findById(dto.counterpartAccountId, workspaceId);
+      if (!counterpart) throw new NotFoundException('Conta de destino não encontrada');
+      assertAccountActive(counterpart);
+      if (counterpart.type === 'credit_card') {
+        throw new BadRequestException('Use "Pagar fatura" para transferir para o cartão de crédito');
+      }
+    }
+
+    const isOutflow = tx.type === 'expense';
+    const transfer = await this.db.transaction(async (trx) => {
+      const target = counterpart ?? (await this.investmentAccounts.findOrCreate(account, trx));
+      await this.transactionRepository.delete(tx.id, workspaceId, trx);
+      const created = await this.transferRepository.create(
+        {
+          workspaceId,
+          fromAccountId: isOutflow ? account.id : target.id,
+          toAccountId: isOutflow ? target.id : account.id,
+          amount: tx.amount,
+          description: tx.description,
+          date: tx.date,
+          externalId: tx.externalId,
+        },
+        trx,
+      );
+      await this.bankAccountRepository.updateBalance(target.id, isOutflow ? tx.amount : -tx.amount, trx);
+      return created;
+    });
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'transfer.created',
+      entityType: 'transfer',
+      entityId: transfer.id,
+      metadata: { amount: transfer.amount, convertedFromTransaction: id },
+    });
+
+    return transfer;
   }
 
   async remove(

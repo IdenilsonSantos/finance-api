@@ -27,6 +27,7 @@ import {
   ListTransactionsDto,
   TransactionsSummaryDto,
   DeleteTransactionQueryDto,
+  ConvertToTransferDto,
 } from '../dto/transaction.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
@@ -98,6 +99,19 @@ export class TransactionsController {
     @Body() dto: UpdateTransactionDto,
   ) {
     return this.transactionsService.update(id, workspaceId, dto, userId);
+  }
+
+  @Post(':id/convert-to-transfer')
+  @ApiOperation({ summary: 'Turn a transaction into a transfer (e.g. an investment deposit)' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 201, description: 'Transfer created and transaction removed' })
+  convertToTransfer(
+    @WorkspaceId() workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
+    @Body() dto: ConvertToTransferDto,
+  ) {
+    return this.transactionsService.convertToTransfer(id, workspaceId, dto, userId);
   }
 
   @Delete(':id')
