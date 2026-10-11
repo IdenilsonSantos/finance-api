@@ -6,6 +6,7 @@ describe('TransactionsService', () => {
   let bankAccountRepo: any;
   let db: any;
   let service: TransactionsService;
+  let budgetAlerts: any;
 
   const card = { id: 'card-1', name: 'Nubank', type: 'credit_card', archivedAt: null };
   const checking = { id: 'acc-1', name: 'Itaú', type: 'checking', archivedAt: null };
@@ -20,7 +21,8 @@ describe('TransactionsService', () => {
     bankAccountRepo = { findById: jest.fn(), updateBalance: jest.fn() };
     db = { transaction: jest.fn(async (cb: (trx: any) => Promise<unknown>) => cb(db)) };
     const activity = { log: jest.fn() };
-    service = new TransactionsService(transactionRepo, bankAccountRepo, db, activity as any);
+    budgetAlerts = { checkThresholds: jest.fn().mockResolvedValue(undefined) };
+    service = new TransactionsService(transactionRepo, bankAccountRepo, db, activity as any, budgetAlerts);
   });
 
   const purchase = {
@@ -48,6 +50,33 @@ describe('TransactionsService', () => {
     expect(rows[0]).not.toHaveProperty('installments');
     expect(bankAccountRepo.updateBalance).toHaveBeenCalledTimes(1);
     expect(bankAccountRepo.updateBalance).toHaveBeenCalledWith('card-1', -10000, db);
+  });
+
+  it('falha no alerta de orçamento não derruba a operação já gravada', async () => {
+    bankAccountRepo.findById.mockResolvedValue(checking);
+    transactionRepo.findById.mockResolvedValue({
+      id: 'tx-1',
+      bankAccountId: 'acc-1',
+      type: 'expense',
+      amount: 1000,
+      status: 'paid',
+    }); // sem date/category: o cálculo do alerta lança
+    transactionRepo.update = jest.fn(async () => ({ id: 'tx-1' }));
+
+    await expect(service.update('tx-1', 'ws-1', { description: 'x' }, 'user-1')).resolves.toEqual({
+      id: 'tx-1',
+    });
+  });
+
+  it('verifica os orçamentos de cada mês das parcelas', async () => {
+    bankAccountRepo.findById.mockResolvedValue(card);
+
+    await service.create({ ...purchase, installments: 2 }, 'ws-1', 'user-1');
+
+    expect(budgetAlerts.checkThresholds).toHaveBeenCalledWith('ws-1', [
+      { month: '2024-01', category: 'clothing', delta: 5000 },
+      { month: '2024-02', category: 'clothing', delta: 5000 },
+    ]);
   });
 
   it('recusa parcelamento fora do cartão de crédito', async () => {
@@ -101,6 +130,8 @@ describe('TransactionsService', () => {
         id: 'tx-1',
         bankAccountId: 'acc-1',
         type: 'expense',
+        category: 'housing',
+        date: '2024-02-10',
         amount: 25000,
         status: 'pending',
       });
@@ -118,6 +149,8 @@ describe('TransactionsService', () => {
         id: 'tx-1',
         bankAccountId: 'acc-1',
         type: 'income',
+        category: 'salary',
+        date: '2024-02-05',
         amount: 500000,
         status: 'paid',
       });

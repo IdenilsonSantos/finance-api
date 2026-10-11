@@ -21,6 +21,21 @@ export class UpdateNotificationPrefsDto {
   @IsBoolean()
   @IsOptional()
   transferCreated?: boolean;
+
+  @ApiPropertyOptional({ example: true, description: 'Orçamento chegou a 80% ou estourou' })
+  @IsBoolean()
+  @IsOptional()
+  budgetAlert?: boolean;
+
+  @ApiPropertyOptional({ example: true, description: 'Contas a pagar/receber vencendo ou atrasadas' })
+  @IsBoolean()
+  @IsOptional()
+  billReminder?: boolean;
+
+  @ApiPropertyOptional({ example: true, description: 'Fatura do cartão de crédito vencendo' })
+  @IsBoolean()
+  @IsOptional()
+  invoiceReminder?: boolean;
 }
 
 export type NotifPrefs = Required<UpdateNotificationPrefsDto>;
@@ -30,4 +45,7 @@ export const DEFAULT_PREFS: NotifPrefs = {
   goalDeadline: true,
   scheduledReminder: true,
   transferCreated: false,
+  budgetAlert: true,
+  billReminder: true,
+  invoiceReminder: true,
 };

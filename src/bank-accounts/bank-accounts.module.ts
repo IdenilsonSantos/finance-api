@@ -24,6 +24,6 @@ import { CategoryInferenceService } from './services/category-inference.service'
     { provide: ITransactionRepository, useClass: DrizzleTransactionRepository },
   ],
   controllers: [BankAccountsController],
-  exports: [IBankAccountRepository],
+  exports: [IBankAccountRepository, BankAccountsService],
 })
 export class BankAccountsModule {}
