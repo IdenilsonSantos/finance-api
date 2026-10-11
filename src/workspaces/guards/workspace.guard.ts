@@ -7,6 +7,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { isUUID } from 'class-validator';
 import { IWorkspaceMemberRepository } from '../../core/repositories/workspace-member.repository.interface';
 
 @Injectable()
@@ -23,6 +24,11 @@ export class WorkspaceGuard implements CanActivate {
 
     if (!workspaceId) {
       throw new BadRequestException('O cabeçalho x-workspace-id é obrigatório');
+    }
+
+    // Evita erro 500 do Postgres ao comparar um valor não-UUID com a coluna.
+    if (!isUUID(workspaceId)) {
+      throw new BadRequestException('O cabeçalho x-workspace-id é inválido');
     }
 
     if (!user?.userId) {
