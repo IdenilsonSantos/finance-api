@@ -7,6 +7,8 @@ describe('TransactionsService', () => {
   let db: any;
   let service: TransactionsService;
   let budgetAlerts: any;
+  let investmentAccounts: any;
+  let transferRepo: any;
 
   const card = { id: 'card-1', name: 'Nubank', type: 'credit_card', archivedAt: null };
   const checking = { id: 'acc-1', name: 'Itaú', type: 'checking', archivedAt: null };
@@ -22,7 +24,17 @@ describe('TransactionsService', () => {
     db = { transaction: jest.fn(async (cb: (trx: any) => Promise<unknown>) => cb(db)) };
     const activity = { log: jest.fn() };
     budgetAlerts = { checkThresholds: jest.fn().mockResolvedValue(undefined) };
-    service = new TransactionsService(transactionRepo, bankAccountRepo, db, activity as any, budgetAlerts);
+    investmentAccounts = { findOrCreate: jest.fn().mockResolvedValue({ id: 'inv-1', type: 'investment' }) };
+    transferRepo = { create: jest.fn(async (data: any) => ({ id: 'tr-1', ...data })) };
+    service = new TransactionsService(
+      transactionRepo,
+      bankAccountRepo,
+      db,
+      activity as any,
+      budgetAlerts,
+      investmentAccounts,
+      transferRepo,
+    );
   });
 
   const purchase = {
@@ -183,6 +195,67 @@ describe('TransactionsService', () => {
       await expect(
         service.create({ ...purchase, status: 'pending' }, 'ws-1', 'user-1'),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('converter em transferência', () => {
+    const application = {
+      id: 'tx-1',
+      bankAccountId: 'acc-1',
+      type: 'expense',
+      amount: 175000,
+      status: 'paid',
+      category: 'investment',
+      description: 'Aplicação RDB',
+      date: '2026-09-17',
+      externalId: 'FIT-1',
+      installmentGroupId: null,
+    };
+
+    it('aplicação vira transferência para a conta de investimento vinculada', async () => {
+      bankAccountRepo.findById.mockResolvedValue(checking);
+      transactionRepo.findById.mockResolvedValue(application);
+
+      await service.convertToTransfer('tx-1', 'ws-1', {}, 'user-1');
+
+      expect(investmentAccounts.findOrCreate).toHaveBeenCalledWith(checking, db);
+      expect(transactionRepo.delete).toHaveBeenCalledWith('tx-1', 'ws-1', db);
+      expect(transferRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fromAccountId: 'acc-1',
+          toAccountId: 'inv-1',
+          amount: 175000,
+          date: '2026-09-17',
+          externalId: 'FIT-1',
+        }),
+        db,
+      );
+      // Só a conta de investimento muda: o valor já tinha saído da conta corrente.
+      expect(bankAccountRepo.updateBalance).toHaveBeenCalledTimes(1);
+      expect(bankAccountRepo.updateBalance).toHaveBeenCalledWith('inv-1', 175000, db);
+    });
+
+    it('resgate vira transferência vinda da conta de investimento', async () => {
+      bankAccountRepo.findById.mockResolvedValue(checking);
+      transactionRepo.findById.mockResolvedValue({ ...application, type: 'income', amount: 51000 });
+
+      await service.convertToTransfer('tx-1', 'ws-1', {}, 'user-1');
+
+      expect(transferRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ fromAccountId: 'inv-1', toAccountId: 'acc-1', amount: 51000 }),
+        db,
+      );
+      expect(bankAccountRepo.updateBalance).toHaveBeenCalledWith('inv-1', -51000, db);
+    });
+
+    it('recusa transação pendente', async () => {
+      bankAccountRepo.findById.mockResolvedValue(checking);
+      transactionRepo.findById.mockResolvedValue({ ...application, status: 'pending' });
+
+      await expect(service.convertToTransfer('tx-1', 'ws-1', {}, 'user-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(transferRepo.create).not.toHaveBeenCalled();
     });
   });
 
