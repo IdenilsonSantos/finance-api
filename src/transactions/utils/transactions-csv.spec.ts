@@ -38,6 +38,15 @@ describe('csvField', () => {
 });
 
 describe('buildTransactionsCsv', () => {
+  it('usa o nome da categoria personalizada', () => {
+    const csv = buildTransactionsCsv(
+      [tx({ category: 'cat-uuid' })] as any,
+      new Map([['acc-1', 'Nubank']]),
+      (key) => (key === 'cat-uuid' ? 'Pets' : key),
+    );
+    expect(csv).toContain(';Pets;Despesa;');
+  });
+
   it('formato pt-BR com BOM, cabeçalho e valores', () => {
     const csv = buildTransactionsCsv(
       [

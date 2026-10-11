@@ -7,7 +7,7 @@ import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 import { ADJUSTMENT_CATEGORY } from '../../core/entities/transaction.entity';
 import { GLOBAL_BUDGET_CATEGORY } from '../../infrastructure/database/drizzle/repositories/drizzle-budget.repository';
-import { categoryLabel } from '../../core/utils/categories';
+import { CategoriesService, CategoryLabelResolver } from '../../categories/services/categories.service';
 import { monthEndISO } from '../../core/utils/date';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 
@@ -44,6 +44,7 @@ export class BudgetAlertsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly notificationsService: NotificationsService,
+    private readonly categoriesService: CategoriesService,
   ) {}
 
   /**
@@ -68,6 +69,7 @@ export class BudgetAlertsService {
       if (budgets.length === 0) continue;
 
       const spending = await this.monthSpending(workspaceId, month);
+      const labelOf = await this.categoriesService.labelResolver(workspaceId);
       const totalSpent = [...spending.values()].reduce((a, b) => a + b, 0);
 
       for (const budget of budgets) {
@@ -79,7 +81,7 @@ export class BudgetAlertsService {
         const threshold = crossedThreshold(after - delta, after, budget.amount);
         if (!threshold) continue;
 
-        await this.notify(workspaceId, budget, after, threshold).catch((err: unknown) =>
+        await this.notify(workspaceId, budget, after, threshold, labelOf).catch((err: unknown) =>
           this.logger.error(`Falha ao notificar orçamento ${budget.id}`, err instanceof Error ? err.stack : String(err)),
         );
       }
@@ -91,8 +93,9 @@ export class BudgetAlertsService {
     budget: { category: string; amount: number; month: string },
     spent: number,
     threshold: BudgetThreshold,
+    labelOf: CategoryLabelResolver,
   ) {
-    const label = categoryLabel(budget.category);
+    const label = labelOf(budget.category);
     const monthLabel = format(parseISO(`${budget.month}-01`), "MMMM 'de' yyyy", { locale: ptBR });
     const percent = Math.floor((spent * 100) / budget.amount);
     const title =

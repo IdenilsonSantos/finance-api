@@ -34,6 +34,7 @@ describe('TransactionsService', () => {
       budgetAlerts,
       investmentAccounts,
       transferRepo,
+      { labelResolver: jest.fn().mockResolvedValue((key: string) => key) } as any,
     );
   });
 

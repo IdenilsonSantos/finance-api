@@ -303,3 +303,21 @@ export const workspaceActivity = pgTable(
   },
   (t) => [index('workspaceActivity_workspace_createdAt_idx').on(t.workspaceId, t.createdAt)],
 );
+
+/** Categorias criadas pelo usuário (as padrão ficam no código: food, salary...). */
+export const category = pgTable(
+  'category',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspaceId')
+      .notNull()
+      .references(() => workspace.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    type: text('type', { enum: ['income', 'expense'] }).notNull(),
+    color: text('color').notNull().default('#64748b'),
+    icon: text('icon').notNull().default('tag'),
+    createdAt: timestamp('createdAt').defaultNow().notNull(),
+    updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('category_workspace_type_name_idx').on(t.workspaceId, t.type, t.name)],
+);

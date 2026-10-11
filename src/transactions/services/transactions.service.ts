@@ -13,6 +13,7 @@ import { IBankAccountRepository } from '../../core/repositories/bank-account.rep
 import { ITransferRepository } from '../../core/repositories/transfer.repository.interface';
 import { BankAccountEntity } from '../../core/entities/bank-account.entity';
 import { InvestmentAccountsService } from '../../bank-accounts/services/investment-accounts.service';
+import { CategoriesService } from '../../categories/services/categories.service';
 import {
   CreateTransactionDto,
   UpdateTransactionDto,
@@ -59,6 +60,7 @@ export class TransactionsService {
     private readonly investmentAccounts: InvestmentAccountsService,
     @Inject(ITransferRepository)
     private readonly transferRepository: ITransferRepository,
+    private readonly categoriesService: CategoriesService,
   ) {}
 
   /**
@@ -193,7 +195,7 @@ export class TransactionsService {
 
   /** CSV das transações filtradas, em ordem cronológica (para planilhas). */
   async exportCsv(workspaceId: string, filters: ExportTransactionsDto): Promise<string> {
-    const [result, accounts] = await Promise.all([
+    const [result, accounts, labelOf] = await Promise.all([
       this.transactionRepository.findAllByWorkspace(workspaceId, {
         ...filters,
         page: 1,
@@ -201,8 +203,9 @@ export class TransactionsService {
         order: 'asc',
       }),
       this.bankAccountRepository.findAllByWorkspace(workspaceId),
+      this.categoriesService.labelResolver(workspaceId),
     ]);
-    return buildTransactionsCsv(result.data, new Map(accounts.map((a) => [a.id, a.name])));
+    return buildTransactionsCsv(result.data, new Map(accounts.map((a) => [a.id, a.name])), labelOf);
   }
 
   async summary(workspaceId: string, filters: TransactionsSummaryDto) {

@@ -8,6 +8,7 @@ import * as schema from '../../db/schema';
 import { APP_TIMEZONE, parseISODate, toISODate, todayISO } from '../../core/utils/date';
 import { categoryLabel } from '../../core/utils/categories';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { CategoriesService } from '../../categories/services/categories.service';
 import { BankAccountsService } from '../../bank-accounts/services/bank-accounts.service';
 import { CardCycle, invoicePeriod } from '../../core/utils/credit-card';
 
@@ -42,7 +43,11 @@ export function reminderDates(today: string) {
  * antes, no dia e no dia seguinte ao vencimento), então ninguém recebe o mesmo
  * aviso todos os dias.
  */
-export function buildBillsReminder(bills: PendingBill[], today: string) {
+export function buildBillsReminder(
+  bills: PendingBill[],
+  today: string,
+  labelOf: (category: string) => string = categoryLabel,
+) {
   const dates = reminderDates(today);
   const when = (date: string) =>
     date === dates.overdue ? 'venceu ontem' : date === dates.today ? 'vence hoje' : `vence em ${REMINDER_DAYS_BEFORE} dias`;
@@ -50,7 +55,7 @@ export function buildBillsReminder(bills: PendingBill[], today: string) {
   const sorted = [...bills].sort((a, b) => order.indexOf(a.date) - order.indexOf(b.date));
 
   const items = sorted.map((b) => ({
-    description: b.description || categoryLabel(b.category),
+    description: b.description || labelOf(b.category),
     amount: b.amount,
     when: when(b.date),
     kind: (b.type === 'expense' ? 'pay' : 'receive') as 'pay' | 'receive',
@@ -96,6 +101,7 @@ export class DueRemindersService {
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly notificationsService: NotificationsService,
     private readonly bankAccountsService: BankAccountsService,
+    private readonly categoriesService: CategoriesService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: APP_TIMEZONE })
@@ -172,7 +178,8 @@ export class DueRemindersService {
     }
 
     for (const [workspaceId, workspaceBills] of byWorkspace) {
-      const reminder = buildBillsReminder(workspaceBills, today);
+      const labelOf = await this.categoriesService.labelResolver(workspaceId);
+      const reminder = buildBillsReminder(workspaceBills, today, labelOf);
       await this.notificationsService
         .notifyWorkspace(workspaceId, 'billReminder', { title: reminder.title, body: reminder.body }, (email) =>
           this.notificationsService.sendBillsReminder({
