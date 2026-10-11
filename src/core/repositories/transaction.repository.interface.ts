@@ -15,9 +15,27 @@ export interface ListTransactionsFilters {
   search?: string;
 }
 
+export interface TransactionsSummaryFilters {
+  startDate?: string;
+  endDate?: string;
+  accountId?: string;
+}
+
+export interface TransactionsSummary {
+  income: number;
+  expense: number;
+  balance: number;
+  incomeCount: number;
+  expenseCount: number;
+  /** Datas (YYYY-MM-DD) com ao menos uma movimentação no período. */
+  activeDates: string[];
+}
+
 export interface ITransactionRepository {
   findById(id: string, workspaceId: string): Promise<TransactionEntity | null>;
   findAllByWorkspace(workspaceId: string, filters: ListTransactionsFilters): Promise<PaginatedResult<TransactionEntity>>;
+  /** Totais de receitas/despesas do período, sem lançamentos de ajuste. */
+  summarize(workspaceId: string, filters: TransactionsSummaryFilters): Promise<TransactionsSummary>;
   create(data: Partial<TransactionEntity>, trx?: any): Promise<TransactionEntity>;
   update(id: string, workspaceId: string, data: Partial<TransactionEntity>, trx?: any): Promise<TransactionEntity>;
   delete(id: string, workspaceId: string, trx?: any): Promise<void>;

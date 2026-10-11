@@ -1,5 +1,12 @@
 export type TransactionType = 'income' | 'expense';
 
+/**
+ * Lançamentos de ajuste de saldo (saldo inicial, correção manual, conciliação
+ * de extrato). Movimentam o saldo da conta, mas não são receita nem despesa:
+ * ficam fora de relatórios, orçamentos e totais do período.
+ */
+export const ADJUSTMENT_CATEGORY = 'adjustment';
+
 export class TransactionEntity {
   id: string;
   workspaceId: string;

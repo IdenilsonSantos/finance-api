@@ -7,7 +7,12 @@ import {
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
-import { CreateTransactionDto, UpdateTransactionDto, ListTransactionsDto } from '../dto/transaction.dto';
+import {
+  CreateTransactionDto,
+  UpdateTransactionDto,
+  ListTransactionsDto,
+  TransactionsSummaryDto,
+} from '../dto/transaction.dto';
 import { ActivityService } from '../../activity/activity.service';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
@@ -86,6 +91,14 @@ export class TransactionsService {
       startDate: filters.startDate,
       endDate: filters.endDate,
       search: filters.search,
+    });
+  }
+
+  async summary(workspaceId: string, filters: TransactionsSummaryDto) {
+    return this.transactionRepository.summarize(workspaceId, {
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      accountId: filters.accountId,
     });
   }
 

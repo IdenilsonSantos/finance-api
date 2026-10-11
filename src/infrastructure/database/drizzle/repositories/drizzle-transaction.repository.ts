@@ -1,10 +1,15 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte, count, inArray, isNotNull, ilike, or, sql, SQL } from 'drizzle-orm';
+import { eq, and, gte, lte, count, inArray, isNotNull, ilike, or, sql, SQL, desc, ne } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
-import { TransactionEntity } from '../../../../core/entities/transaction.entity';
-import { ITransactionRepository, ListTransactionsFilters } from '../../../../core/repositories/transaction.repository.interface';
+import { TransactionEntity, ADJUSTMENT_CATEGORY } from '../../../../core/entities/transaction.entity';
+import {
+  ITransactionRepository,
+  ListTransactionsFilters,
+  TransactionsSummary,
+  TransactionsSummaryFilters,
+} from '../../../../core/repositories/transaction.repository.interface';
 import { PaginatedResult } from '../../../../core/dto/pagination.dto';
 import { paginate } from '../helpers/paginate.helper';
 
@@ -39,10 +44,12 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
     if (startDate) conditions.push(gte(schema.transaction.date, startDate));
     if (endDate) conditions.push(lte(schema.transaction.date, endDate));
     if (search) {
+      // Escapa curingas do LIKE para que "%" e "_" digitados sejam literais.
+      const pattern = `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
       conditions.push(
         or(
-          ilike(schema.transaction.description, `%${search}%`),
-          ilike(schema.transaction.beneficiary, `%${search}%`),
+          ilike(schema.transaction.description, pattern),
+          ilike(schema.transaction.beneficiary, pattern),
         ) as SQL,
       );
     }
@@ -58,7 +65,8 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
       .select()
       .from(schema.transaction)
       .where(where)
-      .orderBy(schema.transaction.date, schema.transaction.createdAt)
+      // Extrato: mais recentes primeiro.
+      .orderBy(desc(schema.transaction.date), desc(schema.transaction.createdAt))
       .limit(lim)
       .offset(offset);
 
@@ -70,6 +78,45 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
       page,
       limit,
       totalPages: Math.ceil(totalNum / limit),
+    };
+  }
+
+  async summarize(
+    workspaceId: string,
+    filters: TransactionsSummaryFilters,
+  ): Promise<TransactionsSummary> {
+    const conditions: SQL[] = [eq(schema.transaction.workspaceId, workspaceId)];
+    if (filters.accountId) conditions.push(eq(schema.transaction.bankAccountId, filters.accountId));
+    if (filters.startDate) conditions.push(gte(schema.transaction.date, filters.startDate));
+    if (filters.endDate) conditions.push(lte(schema.transaction.date, filters.endDate));
+    const where = and(...conditions);
+
+    const [totals] = await this.db
+      .select({
+        income: sql<string>`coalesce(sum(${schema.transaction.amount}) filter (where ${schema.transaction.type} = 'income'), 0)`,
+        expense: sql<string>`coalesce(sum(${schema.transaction.amount}) filter (where ${schema.transaction.type} = 'expense'), 0)`,
+        incomeCount: sql<string>`count(*) filter (where ${schema.transaction.type} = 'income')`,
+        expenseCount: sql<string>`count(*) filter (where ${schema.transaction.type} = 'expense')`,
+      })
+      .from(schema.transaction)
+      .where(and(where, ne(schema.transaction.category, ADJUSTMENT_CATEGORY)));
+
+    const dates = await this.db
+      .selectDistinct({ date: schema.transaction.date })
+      .from(schema.transaction)
+      .where(where)
+      .orderBy(schema.transaction.date);
+
+    const income = Number(totals?.income ?? 0);
+    const expense = Number(totals?.expense ?? 0);
+
+    return {
+      income,
+      expense,
+      balance: income - expense,
+      incomeCount: Number(totals?.incomeCount ?? 0),
+      expenseCount: Number(totals?.expenseCount ?? 0),
+      activeDates: dates.map((d) => d.date),
     };
   }
 

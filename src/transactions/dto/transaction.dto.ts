@@ -87,6 +87,23 @@ export class ListTransactionsDto extends PaginationDto {
   search?: string;
 }
 
+export class TransactionsSummaryDto {
+  @ApiPropertyOptional({ example: '2024-01-01' })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({ example: '2024-01-31' })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-da-conta', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  accountId?: string;
+}
+
 export class UpdateTransactionDto {
   @ApiPropertyOptional({ example: 'uuid-da-conta', format: 'uuid' })
   @IsOptional()
