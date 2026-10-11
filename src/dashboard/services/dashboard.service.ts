@@ -6,6 +6,7 @@ import { ptBR } from 'date-fns/locale';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 import { ADJUSTMENT_CATEGORY } from '../../core/entities/transaction.entity';
+import { GLOBAL_BUDGET_CATEGORY } from '../../infrastructure/database/drizzle/repositories/drizzle-budget.repository';
 
 @Injectable()
 export class DashboardService {
@@ -173,7 +174,7 @@ export class DashboardService {
     }, 0);
 
     // Orçamento global
-    const globalBudget = budgets.find((b) => b.category === 'all');
+    const globalBudget = budgets.find((b) => b.category === GLOBAL_BUDGET_CATEGORY);
     const totalBudgetLimit = globalBudget?.amount ?? 0;
     const remainingBudget = Math.max(0, totalBudgetLimit - monthExpenses);
 
@@ -315,19 +316,20 @@ export class DashboardService {
       averageSavings: Math.round(averageSavings),
       currentMonthSavings: monthSavings,
 
-      budgets: budgets.map((b) => ({
-        id: b.id,
-        category: b.category,
-        amount: b.amount,
-        spent: categoryMap[b.category] ?? 0,
-        remaining: Math.max(0, b.amount - (categoryMap[b.category] ?? 0)),
-        percentage:
-          b.amount > 0
-            ? Math.round(
-                ((categoryMap[b.category] ?? 0) / b.amount) * 100,
-              )
-            : 0,
-      })),
+      budgets: budgets.map((b) => {
+        const spent =
+          b.category === GLOBAL_BUDGET_CATEGORY
+            ? monthExpenses
+            : (categoryMap[b.category] ?? 0);
+        return {
+          id: b.id,
+          category: b.category,
+          amount: b.amount,
+          spent,
+          remaining: Math.max(0, b.amount - spent),
+          percentage: b.amount > 0 ? Math.round((spent / b.amount) * 100) : 0,
+        };
+      }),
 
       goals: goals.map((g) => ({
         id: g.id,

@@ -21,7 +21,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { BudgetsService } from '../services/budgets.service';
-import { CreateBudgetDto, UpdateBudgetDto } from '../dto/budget.dto';
+import { BudgetMonthQueryDto, CopyBudgetsDto, CreateBudgetDto, UpdateBudgetDto } from '../dto/budget.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
@@ -53,9 +53,20 @@ export class BudgetsController {
   @ApiResponse({ status: 200, description: 'Budget summary returned' })
   getSummary(
     @WorkspaceId() workspaceId: string,
-    @Query('month') month: string,
+    @Query() query: BudgetMonthQueryDto,
   ) {
-    return this.budgetsService.getSummary(workspaceId, month);
+    return this.budgetsService.getSummary(workspaceId, query.month);
+  }
+
+  @Post('copy')
+  @ApiOperation({ summary: 'Copy budgets from one month to another' })
+  @ApiResponse({ status: 201, description: 'Budgets copied' })
+  copy(
+    @WorkspaceId() workspaceId: string,
+    @GetUser('userId') userId: string,
+    @Body() dto: CopyBudgetsDto,
+  ) {
+    return this.budgetsService.copy(dto, workspaceId, userId);
   }
 
   @Get()
