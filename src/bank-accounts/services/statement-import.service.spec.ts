@@ -78,6 +78,7 @@ describe('StatementImportService', () => {
 
   beforeEach(() => {
     bankAccountRepository = {
+      findAllByWorkspace: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue({
         id: bankAccountId,
         workspaceId,
@@ -281,6 +282,49 @@ describe('StatementImportService', () => {
     expect(bankAccountRepository.updateBalance).toHaveBeenCalledWith('inv-1', 175000 - 51000, db);
     expect(result.investmentTransfers).toBe(2);
     expect(result.investmentAccountName).toBe('Investimentos · Conta Corrente');
+  });
+
+  it('pagamento de fatura vira transferência para o cartão cadastrado', async () => {
+    bankAccountRepository.findAllByWorkspace = jest.fn().mockResolvedValue([
+      { id: bankAccountId, name: 'Conta Corrente', type: 'checking', archivedAt: null },
+      { id: 'card-1', name: 'Cartão Nubank', type: 'credit_card', archivedAt: null },
+    ]);
+    const file = statement({
+      start: '20261001000000',
+      end: '20261010235959',
+      transactions: [
+        { fitId: 'FAT1', date: '20261006', amount: '-714.30', memo: 'Pagamento de fatura' },
+        { fitId: 'BOL1', date: '20261009', amount: '-7.99', memo: 'Pagamento de boleto efetuado - LUIZA CRED' },
+      ],
+    });
+
+    const result = await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(transferRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ fromAccountId: bankAccountId, toAccountId: 'card-1', amount: 71430, externalId: 'FAT1' }),
+      db,
+    );
+    expect(transactionRepository.create).toHaveBeenCalledTimes(1); // só o boleto
+    expect(bankAccountRepository.updateBalance).toHaveBeenCalledWith('card-1', 71430, db);
+    expect(bankAccountRepository.updateBalance).toHaveBeenCalledWith(bankAccountId, -71430 - 799, db);
+    expect(result.cardPayments).toBe(1);
+  });
+
+  it('sem cartão cadastrado, pagamento de fatura continua como despesa', async () => {
+    bankAccountRepository.findAllByWorkspace = jest.fn().mockResolvedValue([
+      { id: bankAccountId, name: 'Conta Corrente', type: 'checking', archivedAt: null },
+    ]);
+    const file = statement({
+      start: '20261001000000',
+      end: '20261010235959',
+      transactions: [{ fitId: 'FAT1', date: '20261006', amount: '-714.30', memo: 'Pagamento de fatura' }],
+    });
+
+    const result = await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(transferRepository.create).not.toHaveBeenCalled();
+    expect(transactionRepository.create).toHaveBeenCalledTimes(1);
+    expect(result.cardPayments).toBe(0);
   });
 
   it('não converte movimentos em cartão de crédito', async () => {

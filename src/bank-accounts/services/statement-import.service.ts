@@ -15,6 +15,7 @@ import * as schema from '../../db/schema';
 import { TransactionEntity, balanceEffect } from '../../core/entities/transaction.entity';
 import { assertAccountActive } from '../../core/utils/accounts';
 import { classifyInvestmentMovement } from '../../core/utils/investments';
+import { isCardBillPayment, pickCardForPayment } from '../../core/utils/card-payments';
 import { ITransferRepository } from '../../core/repositories/transfer.repository.interface';
 import { InvestmentAccountsService } from './investment-accounts.service';
 import { addDays, differenceInCalendarDays } from 'date-fns';
@@ -36,6 +37,8 @@ export interface ImportResult {
   investmentTransfers?: number;
   /** Conta de investimento que recebeu as aplicações/resgates. */
   investmentAccountName?: string;
+  /** Pagamentos de fatura registrados como transferência para o cartão. */
+  cardPayments?: number;
   total: number;
   accountCreated?: boolean;
   accountName?: string;
@@ -369,6 +372,19 @@ export class StatementImportService {
     );
     let investmentAccountName: string | undefined;
 
+    // Pagamentos de fatura viram transferências para o cartão (quando ele está
+    // cadastrado e dá para identificá-lo); as compras do cartão é que são despesa.
+    const workspaceAccounts =
+      sourceAccount && sourceAccount.type !== 'credit_card'
+        ? await this.bankAccountRepository.findAllByWorkspace(workspaceId)
+        : [];
+    const cardPayments = new Map<string, { id: string }>();
+    for (const t of newTransactions) {
+      if (!sourceAccount || movements.has(t.fitId) || !isCardBillPayment(t.description, t.type)) continue;
+      const card = pickCardForPayment(workspaceAccounts, sourceAccount.name, t.description);
+      if (card) cardPayments.set(t.fitId, card);
+    }
+
     // Insere em lote dentro de uma única transação de banco
     await this.db.transaction(async (trx) => {
       let totalDelta = 0;
@@ -379,7 +395,28 @@ export class StatementImportService {
           : null;
       investmentAccountName = investment?.name;
 
+      const cardDeltas = new Map<string, number>();
+
       for (const t of newTransactions) {
+        const card = cardPayments.get(t.fitId);
+        if (card) {
+          await this.transferRepository.create(
+            {
+              workspaceId,
+              fromAccountId: resolvedAccountId,
+              toAccountId: card.id,
+              amount: t.amountInCents,
+              description: t.description,
+              date: t.date,
+              externalId: t.fitId,
+            },
+            trx,
+          );
+          totalDelta -= t.amountInCents;
+          cardDeltas.set(card.id, (cardDeltas.get(card.id) ?? 0) + t.amountInCents);
+          continue;
+        }
+
         if (investment && movements.has(t.fitId)) {
           const isDeposit = movements.get(t.fitId) === 'deposit';
           await this.transferRepository.create(
@@ -417,6 +454,9 @@ export class StatementImportService {
 
       if (investment && investmentDelta !== 0) {
         await this.bankAccountRepository.updateBalance(investment.id, investmentDelta, trx);
+      }
+      for (const [cardId, delta] of cardDeltas) {
+        await this.bankAccountRepository.updateBalance(cardId, delta, trx);
       }
 
       for (const { tx, fitId, date } of toSettle) {
@@ -496,6 +536,7 @@ export class StatementImportService {
       settled: toSettle.length,
       investmentTransfers: investmentAccountName ? movements.size : 0,
       investmentAccountName,
+      cardPayments: cardPayments.size,
       total: parsed.length,
       accountCreated,
       accountName: accountCreated ? (accountInfo?.name ?? 'Conta Importada') : undefined,

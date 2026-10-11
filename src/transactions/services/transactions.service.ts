@@ -321,10 +321,9 @@ export class TransactionsService {
       }
       counterpart = await this.bankAccountRepository.findById(dto.counterpartAccountId, workspaceId);
       if (!counterpart) throw new NotFoundException('Conta de destino não encontrada');
+      // Cartão como destino = pagamento de fatura (ex.: "Pagamento de fatura"
+      // importado como despesa); como origem = "Pix no crédito".
       assertAccountActive(counterpart);
-      if (counterpart.type === 'credit_card') {
-        throw new BadRequestException('Use "Pagar fatura" para transferir para o cartão de crédito');
-      }
     }
 
     const isOutflow = tx.type === 'expense';
