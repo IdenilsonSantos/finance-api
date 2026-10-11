@@ -218,7 +218,7 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
     bankAccountId: string,
     asOfDate: string,
   ): Promise<number> {
-    const [result] = await this.db
+    const [txResult] = await this.db
       .select({
         balance: sql<string>`coalesce(sum(case when ${schema.transaction.type} = 'income' then ${schema.transaction.amount} else -${schema.transaction.amount} end), 0)`,
       })
@@ -229,7 +229,25 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
           lte(schema.transaction.date, asOfDate),
         ),
       );
-    return Number(result?.balance ?? 0);
+
+    // Transferências também movimentam o saldo armazenado da conta; sem elas
+    // o saldo reconstruído divergiria do real em toda conta que já transferiu.
+    const [transferResult] = await this.db
+      .select({
+        balance: sql<string>`coalesce(sum(case when ${schema.transfer.toAccountId} = ${bankAccountId} then ${schema.transfer.amount} else -${schema.transfer.amount} end), 0)`,
+      })
+      .from(schema.transfer)
+      .where(
+        and(
+          or(
+            eq(schema.transfer.fromAccountId, bankAccountId),
+            eq(schema.transfer.toAccountId, bankAccountId),
+          ),
+          lte(schema.transfer.date, asOfDate),
+        ),
+      );
+
+    return Number(txResult?.balance ?? 0) + Number(transferResult?.balance ?? 0);
   }
 
   async findEarliestDateByBankAccount(bankAccountId: string): Promise<string | null> {

@@ -5,6 +5,7 @@ import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
+import { ADJUSTMENT_CATEGORY } from '../../core/entities/transaction.entity';
 
 @Injectable()
 export class DashboardService {
@@ -135,8 +136,12 @@ export class DashboardService {
           .limit(5),
       ]);
 
+    // Ajustes de saldo (saldo inicial, conciliação) não são receita/despesa:
+    // ficam fora de todos os totais, gráficos e orçamentos.
+    const flowTxs = transactions.filter((t) => t.category !== ADJUSTMENT_CATEGORY);
+
     // Cálculos mensais
-    const currentMonthTxs = transactions.filter(
+    const currentMonthTxs = flowTxs.filter(
       (t) => t.date >= monthStart && t.date <= monthEnd,
     );
 
@@ -181,7 +186,7 @@ export class DashboardService {
     // FECHADOS (até 3), em vez de extrapolar o ritmo de hoje (que distorce
     // muito quando contas grandes já foram pagas em lote no início do mês).
     const closedMonthExpenses = new Map<string, number>();
-    for (const t of transactions) {
+    for (const t of flowTxs) {
       const key = t.date.substring(0, 7);
       if (key === currentMonth || t.type !== 'expense') continue;
       closedMonthExpenses.set(key, (closedMonthExpenses.get(key) ?? 0) + t.amount);
@@ -229,7 +234,7 @@ export class DashboardService {
       };
     }
 
-    transactions.forEach((t) => {
+    flowTxs.forEach((t) => {
       const key = t.date.substring(0, 7);
       if (monthlyMap[key]) {
         if (t.type === 'income') monthlyMap[key].income += t.amount;

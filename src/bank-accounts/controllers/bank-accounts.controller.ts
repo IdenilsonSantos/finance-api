@@ -27,6 +27,7 @@ import {
 import { BankAccountsService } from '../services/bank-accounts.service';
 import { StatementImportService } from '../services/statement-import.service';
 import {
+  AdjustBalanceDto,
   CreateBankAccountDto,
   UpdateBankAccountDto,
 } from '../dto/bank-account.dto';
@@ -87,6 +88,20 @@ export class BankAccountsController {
     @Body() dto: UpdateBankAccountDto,
   ) {
     return this.bankAccountsService.update(id, workspaceId, dto, userId);
+  }
+
+  @Post(':id/adjust-balance')
+  @ApiOperation({ summary: 'Set the account balance, recording the difference as an adjustment' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 201, description: 'Balance adjusted' })
+  @ApiResponse({ status: 404, description: 'Bank account not found' })
+  adjustBalance(
+    @WorkspaceId() workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
+    @Body() dto: AdjustBalanceDto,
+  ) {
+    return this.bankAccountsService.adjustBalance(id, workspaceId, dto, userId);
   }
 
   @Delete(':id')

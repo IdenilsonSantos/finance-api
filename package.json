@@ -22,7 +22,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "ts-node -r tsconfig-paths/register src/scripts/seed.ts",
-    "seed:admin": "ts-node -r tsconfig-paths/register src/db/seed-admin.ts"
+    "seed:admin": "ts-node -r tsconfig-paths/register src/db/seed-admin.ts",
+    "backfill:opening-balances": "ts-node -r tsconfig-paths/register src/scripts/backfill-opening-balances.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

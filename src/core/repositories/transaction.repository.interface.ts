@@ -54,7 +54,11 @@ export interface ITransactionRepository {
     startDate: string,
     endDate: string,
   ): Promise<TransactionEntity[]>;
-  /** Soma líquida (entradas - saídas) de uma conta até `asOfDate`; usado para conciliar com o banco. */
+  /**
+   * Saldo de uma conta até `asOfDate` (inclusive) reconstruído pelo histórico:
+   * transações (entradas - saídas) + transferências recebidas - enviadas.
+   * Usado para conciliar com o saldo informado pelo banco.
+   */
   sumBalanceByBankAccountUpToDate(
     bankAccountId: string,
     asOfDate: string,
