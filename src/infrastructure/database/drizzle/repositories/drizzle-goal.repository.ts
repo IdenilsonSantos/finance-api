@@ -91,6 +91,23 @@ export class DrizzleGoalRepository implements IGoalRepository {
     return new GoalEntity(result);
   }
 
+  async adjustCurrentAmount(
+    id: string,
+    workspaceId: string,
+    delta: number,
+  ): Promise<GoalEntity | null> {
+    const conditions: SQL[] = [eq(schema.goal.id, id), eq(schema.goal.workspaceId, workspaceId)];
+    // Resgate nunca deixa o valor guardado negativo.
+    if (delta < 0) conditions.push(sql`${schema.goal.currentAmount} + ${delta} >= 0`);
+
+    const [result] = await this.db
+      .update(schema.goal)
+      .set({ currentAmount: sql`${schema.goal.currentAmount} + ${delta}`, updatedAt: new Date() })
+      .where(and(...conditions))
+      .returning();
+    return result ? new GoalEntity(result) : null;
+  }
+
   async delete(id: string, workspaceId: string): Promise<void> {
     await this.db
       .delete(schema.goal)
