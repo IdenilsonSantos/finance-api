@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { BankAccountEntity } from '../../../../core/entities/bank-account.entity';
@@ -87,6 +87,27 @@ export class DrizzleBankAccountRepository implements IBankAccountRepository {
         updatedAt: new Date(),
       })
       .where(eq(schema.bankAccount.id, id));
+  }
+
+  async findLinkedInvestmentAccount(
+    sourceAccountId: string,
+    workspaceId: string,
+    trx?: any,
+  ): Promise<BankAccountEntity | null> {
+    const db = trx || this.db;
+    const [result] = await db
+      .select()
+      .from(schema.bankAccount)
+      .where(
+        and(
+          eq(schema.bankAccount.workspaceId, workspaceId),
+          eq(schema.bankAccount.linkedAccountId, sourceAccountId),
+          eq(schema.bankAccount.type, 'investment'),
+          isNull(schema.bankAccount.archivedAt),
+        ),
+      )
+      .limit(1);
+    return result ? new BankAccountEntity(result) : null;
   }
 
   async delete(id: string, workspaceId: string): Promise<void> {

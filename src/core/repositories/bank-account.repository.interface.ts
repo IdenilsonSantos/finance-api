@@ -22,4 +22,10 @@ export interface IBankAccountRepository {
   /** Avança `balanceAsOf` para `asOfDate`, sem nunca retroceder. */
   advanceBalanceAsOf(id: string, asOfDate: string, trx: any): Promise<void>;
   delete(id: string, workspaceId: string): Promise<void>;
+  /** Conta de investimento ativa vinculada a `sourceAccountId`, se existir. */
+  findLinkedInvestmentAccount(
+    sourceAccountId: string,
+    workspaceId: string,
+    trx?: any,
+  ): Promise<BankAccountEntity | null>;
 }

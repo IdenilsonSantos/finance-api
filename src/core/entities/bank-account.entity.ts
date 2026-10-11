@@ -24,6 +24,8 @@ export class BankAccountEntity {
   /** Cartão de crédito: dia do vencimento da fatura (1-31). */
   dueDay: number | null;
   archivedAt: Date | null;
+  /** Conta de origem, quando esta é a conta de investimento vinculada a ela. */
+  linkedAccountId: string | null;
   createdAt: Date;
   updatedAt: Date;
 
