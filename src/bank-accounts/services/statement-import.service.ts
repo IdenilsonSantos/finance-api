@@ -2,7 +2,6 @@ import {
   Injectable,
   Inject,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { eq, and, gt } from 'drizzle-orm';
@@ -15,7 +14,6 @@ import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 import { assertAccountActive } from '../../core/utils/accounts';
 
-const FREE_PLAN_TRANSACTION_LIMIT = 50;
 
 export interface ImportResult {
   imported: number;
@@ -219,7 +217,7 @@ export class StatementImportService {
       fuzzyPool.set(key, (fuzzyPool.get(key) ?? 0) + 1);
     }
 
-    let newTransactions: OFXTransaction[] = [];
+    const newTransactions: OFXTransaction[] = [];
     let duplicates = 0;
 
     for (const t of parsed) {
@@ -255,26 +253,6 @@ export class StatementImportService {
     }
 
     // Verifica limite do plano Free
-    const now = new Date();
-    const currentCount =
-      await this.transactionRepository.countByWorkspaceAndMonth(
-        workspaceId,
-        now.getFullYear(),
-        now.getMonth() + 1,
-      );
-
-    /* if (currentCount >= FREE_PLAN_TRANSACTION_LIMIT) {
-      throw new ForbiddenException(
-        'Limite de transações do plano atingido. Faça upgrade para continuar.',
-      );
-    } */
-
-    // Importa apenas até o limite restante
-    const remaining = FREE_PLAN_TRANSACTION_LIMIT - currentCount;
-    if (newTransactions.length > remaining) {
-      newTransactions = newTransactions.slice(0, remaining);
-    }
-
     // Conciliação: quando o banco informa o saldo final (LEDGERBAL), valida
     // "saldo anterior + entradas - saídas" contra ele ANTES de persistir
     // qualquer coisa. O saldo do banco nunca é somado ao saldo da conta.
