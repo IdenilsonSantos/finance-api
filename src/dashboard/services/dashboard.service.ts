@@ -78,6 +78,7 @@ export class DashboardService {
             beneficiary: schema.transaction.beneficiary,
             paymentMethod: schema.transaction.paymentMethod,
             date: schema.transaction.date,
+            status: schema.transaction.status,
             bankAccountId: schema.transaction.bankAccountId,
             bankAccountName: schema.bankAccount.name,
             bankAccountColor: schema.bankAccount.color,
@@ -140,11 +141,33 @@ export class DashboardService {
     // Ajustes de saldo (saldo inicial, conciliação) não são receita/despesa:
     // ficam fora de todos os totais, gráficos e orçamentos.
     const flowTxs = transactions.filter((t) => t.category !== ADJUSTMENT_CATEGORY);
+    // Receitas/despesas realizadas consideram só o que foi efetivado.
+    const paidFlowTxs = flowTxs.filter((t) => t.status === 'paid');
+
+    // Contas a pagar/receber até o fim do mês, incluindo as atrasadas.
+    const pendingTxs = flowTxs.filter((t) => t.status === 'pending' && t.date <= monthEnd);
+    const pendingIncome = pendingTxs
+      .filter((t) => t.type === 'income')
+      .reduce((acc, t) => acc + t.amount, 0);
+    const pendingExpenses = pendingTxs
+      .filter((t) => t.type === 'expense')
+      .reduce((acc, t) => acc + t.amount, 0);
+    const overdueCount = pendingTxs.filter((t) => t.date < today).length;
 
     // Cálculos mensais
-    const currentMonthTxs = flowTxs.filter(
+    const currentMonthTxs = paidFlowTxs.filter(
       (t) => t.date >= monthStart && t.date <= monthEnd,
     );
+
+    // Gasto comprometido no mês (pago + a pagar), usado nos orçamentos: uma
+    // conta lançada como pendente já ocupa o orçamento da categoria.
+    const committedByCategory: Record<string, number> = {};
+    let committedMonthExpenses = 0;
+    for (const t of flowTxs) {
+      if (t.type !== 'expense' || t.date < monthStart || t.date > monthEnd) continue;
+      committedByCategory[t.category] = (committedByCategory[t.category] ?? 0) + t.amount;
+      committedMonthExpenses += t.amount;
+    }
 
     const monthIncome = currentMonthTxs
       .filter((t) => t.type === 'income')
@@ -176,7 +199,7 @@ export class DashboardService {
     // Orçamento global
     const globalBudget = budgets.find((b) => b.category === GLOBAL_BUDGET_CATEGORY);
     const totalBudgetLimit = globalBudget?.amount ?? 0;
-    const remainingBudget = Math.max(0, totalBudgetLimit - monthExpenses);
+    const remainingBudget = Math.max(0, totalBudgetLimit - committedMonthExpenses);
 
     // Projeção de saldo
     const upcomingIncome = upcomingScheduled
@@ -187,7 +210,7 @@ export class DashboardService {
     // FECHADOS (até 3), em vez de extrapolar o ritmo de hoje (que distorce
     // muito quando contas grandes já foram pagas em lote no início do mês).
     const closedMonthExpenses = new Map<string, number>();
-    for (const t of flowTxs) {
+    for (const t of paidFlowTxs) {
       const key = t.date.substring(0, 7);
       if (key === currentMonth || t.type !== 'expense') continue;
       closedMonthExpenses.set(key, (closedMonthExpenses.get(key) ?? 0) + t.amount);
@@ -206,13 +229,19 @@ export class DashboardService {
         ? recentClosedMonths.reduce((a, b) => a + b, 0) / recentClosedMonths.length
         : monthExpenses;
 
+    // As contas pendentes já são parte do que falta gastar: a estimativa
+    // histórica só cobre o que ainda não foi lançado.
     const estimatedRemainingExpenses = Math.max(
       0,
-      historicalAvgMonthlyExpense - monthExpenses,
+      historicalAvgMonthlyExpense - monthExpenses - pendingExpenses,
     );
 
     const projectedLiquidBalance =
-      availableLiquidity + upcomingIncome - estimatedRemainingExpenses;
+      availableLiquidity +
+      upcomingIncome +
+      pendingIncome -
+      pendingExpenses -
+      estimatedRemainingExpenses;
     const projectedBalance = projectedLiquidBalance - monthlyGoalsTarget;
 
     const savingsRate =
@@ -235,7 +264,7 @@ export class DashboardService {
       };
     }
 
-    flowTxs.forEach((t) => {
+    paidFlowTxs.forEach((t) => {
       const key = t.date.substring(0, 7);
       if (monthlyMap[key]) {
         if (t.type === 'income') monthlyMap[key].income += t.amount;
@@ -307,11 +336,14 @@ export class DashboardService {
         projectedBalance: Math.round(projectedBalance),
         remainingBudget,
         monthlyGoalsTarget: Math.round(monthlyGoalsTarget),
-        isOverBudget: monthExpenses > totalBudgetLimit && totalBudgetLimit > 0,
+        isOverBudget: committedMonthExpenses > totalBudgetLimit && totalBudgetLimit > 0,
         savingsRate: Math.round(savingsRate * 10) / 10,
         monthExpenses,
         monthIncome,
         monthSavings,
+        pendingIncome,
+        pendingExpenses,
+        overdueCount,
       },
 
       cashFlow,
@@ -323,8 +355,8 @@ export class DashboardService {
       budgets: budgets.map((b) => {
         const spent =
           b.category === GLOBAL_BUDGET_CATEGORY
-            ? monthExpenses
-            : (categoryMap[b.category] ?? 0);
+            ? committedMonthExpenses
+            : (committedByCategory[b.category] ?? 0);
         return {
           id: b.id,
           category: b.category,
@@ -348,7 +380,8 @@ export class DashboardService {
             : 0,
       })),
 
-      recentTransactions: transactions.slice(0, 10),
+      // Sem lançamentos futuros (parcelas, contas a vencer) nas "recentes".
+      recentTransactions: transactions.filter((t) => t.date <= today).slice(0, 10),
       upcomingScheduled,
     };
   }
