@@ -9,7 +9,7 @@ import { ITransferRepository } from '../../core/repositories/transfer.repository
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { ActivityService } from '../../activity/activity.service';
-import { CreateTransferDto, ListTransfersDto } from '../dto/transfer.dto';
+import { CreateTransferDto, ListTransfersDto, UpdateTransferDto } from '../dto/transfer.dto';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 import { assertAccountActive } from '../../core/utils/accounts';
@@ -106,6 +106,63 @@ export class TransfersService {
     const transfer = await this.transferRepository.findById(id, workspaceId);
     if (!transfer) throw new NotFoundException('Transferência não encontrada');
     return transfer;
+  }
+
+  /**
+   * Edita uma transferência: desfaz o movimento antigo nas duas contas e
+   * aplica o novo, numa única transação de banco.
+   */
+  async update(id: string, workspaceId: string, dto: UpdateTransferDto, userId: string) {
+    const old = await this.findOne(id, workspaceId);
+    const fromAccountId = dto.fromAccountId ?? old.fromAccountId;
+    const toAccountId = dto.toAccountId ?? old.toAccountId;
+    if (fromAccountId === toAccountId) {
+      throw new BadRequestException('As contas de origem e destino devem ser diferentes');
+    }
+
+    const ids = [...new Set([old.fromAccountId, old.toAccountId, fromAccountId, toAccountId])];
+    const accounts = await Promise.all(ids.map((accountId) => this.bankAccountRepository.findById(accountId, workspaceId)));
+    ids.forEach((accountId, i) => {
+      const account = accounts[i];
+      if (!account) {
+        throw new NotFoundException(
+          accountId === toAccountId ? 'Conta de destino não encontrada' : 'Conta de origem não encontrada',
+        );
+      }
+      assertAccountActive(account);
+    });
+
+    const amount = dto.amount !== undefined ? Math.round(dto.amount * 100) : old.amount;
+
+    const updated = await this.db.transaction(async (trx) => {
+      await this.bankAccountRepository.updateBalance(old.fromAccountId, old.amount, trx);
+      await this.bankAccountRepository.updateBalance(old.toAccountId, -old.amount, trx);
+      await this.bankAccountRepository.updateBalance(fromAccountId, -amount, trx);
+      await this.bankAccountRepository.updateBalance(toAccountId, amount, trx);
+      return this.transferRepository.update(
+        id,
+        workspaceId,
+        {
+          fromAccountId,
+          toAccountId,
+          amount,
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.date !== undefined ? { date: dto.date } : {}),
+        },
+        trx,
+      );
+    });
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'transfer.updated',
+      entityType: 'transfer',
+      entityId: id,
+      metadata: { from: old.amount, to: updated.amount },
+    });
+
+    return updated;
   }
 
   async remove(id: string, workspaceId: string, userId: string) {

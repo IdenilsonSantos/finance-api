@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Delete,
+  Patch,
   Body,
   Param,
   Query,
@@ -20,7 +21,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { TransfersService } from '../services/transfers.service';
-import { CreateTransferDto, ListTransfersDto } from '../dto/transfer.dto';
+import { CreateTransferDto, ListTransfersDto, UpdateTransferDto } from '../dto/transfer.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
@@ -66,6 +67,20 @@ export class TransfersController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.transfersService.findOne(id, workspaceId);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a transfer (balances of both accounts are adjusted)' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Transfer updated' })
+  @ApiResponse({ status: 404, description: 'Transfer not found' })
+  update(
+    @WorkspaceId() workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
+    @Body() dto: UpdateTransferDto,
+  ) {
+    return this.transfersService.update(id, workspaceId, dto, userId);
   }
 
   @Delete(':id')

@@ -16,6 +16,7 @@ export type ActivityAction =
   | 'bankAccount.unarchived'
   | 'transfer.created'
   | 'transfer.deleted'
+  | 'transfer.updated'
   | 'budget.created'
   | 'budget.updated'
   | 'budget.deleted'
