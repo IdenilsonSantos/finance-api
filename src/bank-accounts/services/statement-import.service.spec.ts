@@ -71,6 +71,8 @@ describe('StatementImportService', () => {
   let bankAccountRepository: any;
   let transactionRepository: any;
   let categoryInference: any;
+  let investmentAccounts: any;
+  let transferRepository: any;
   let db: any;
   let service: StatementImportService;
 
@@ -103,6 +105,10 @@ describe('StatementImportService', () => {
     };
 
     categoryInference = { infer: jest.fn().mockReturnValue('other') };
+    investmentAccounts = {
+      findOrCreate: jest.fn().mockResolvedValue({ id: 'inv-1', name: 'Investimentos · Conta Corrente' }),
+    };
+    transferRepository = { create: jest.fn().mockResolvedValue({}) };
     db = createDbMock([[]]); // primeira query = checagem de fileHash já importado
 
     service = new StatementImportService(
@@ -111,6 +117,8 @@ describe('StatementImportService', () => {
       bankAccountRepository,
       transactionRepository,
       db,
+      investmentAccounts,
+      transferRepository,
     );
   });
 
@@ -241,6 +249,58 @@ describe('StatementImportService', () => {
     expect(result.duplicates).toBe(1);
     expect(result.settled ?? 0).toBe(0);
     expect(transactionRepository.update).not.toHaveBeenCalled();
+  });
+
+  it('aplicação e resgate viram transferências com a conta de investimento', async () => {
+    const file = statement({
+      start: '20260901000000',
+      end: '20260930235959',
+      transactions: [
+        { fitId: 'APL1', date: '20260917', amount: '-1750.00', memo: 'Aplicação RDB' },
+        { fitId: 'RES1', date: '20260920', amount: '510.00', memo: 'Resgate RDB' },
+        { fitId: 'REN1', date: '20260930', amount: '3.21', memo: 'Rendimento RDB' },
+        { fitId: 'MKT1', date: '20260918', amount: '-80.00', memo: 'Supermercado' },
+      ],
+    });
+
+    const result = await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(investmentAccounts.findOrCreate).toHaveBeenCalledTimes(1);
+    expect(transferRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ fromAccountId: bankAccountId, toAccountId: 'inv-1', amount: 175000, externalId: 'APL1' }),
+      db,
+    );
+    expect(transferRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ fromAccountId: 'inv-1', toAccountId: bankAccountId, amount: 51000, externalId: 'RES1' }),
+      db,
+    );
+    // Rendimento e supermercado continuam como transações normais.
+    expect(transactionRepository.create).toHaveBeenCalledTimes(2);
+    // Conta corrente: -1750 + 510 + 3,21 - 80; investimento: +1750 - 510.
+    expect(bankAccountRepository.updateBalance).toHaveBeenCalledWith(bankAccountId, -175000 + 51000 + 321 - 8000, db);
+    expect(bankAccountRepository.updateBalance).toHaveBeenCalledWith('inv-1', 175000 - 51000, db);
+    expect(result.investmentTransfers).toBe(2);
+    expect(result.investmentAccountName).toBe('Investimentos · Conta Corrente');
+  });
+
+  it('não converte movimentos em cartão de crédito', async () => {
+    bankAccountRepository.findById.mockResolvedValue({
+      id: bankAccountId,
+      workspaceId,
+      name: 'Cartão',
+      type: 'credit_card',
+      balance: 0,
+    });
+    const file = statement({
+      start: '20260901000000',
+      end: '20260930235959',
+      transactions: [{ fitId: 'X1', date: '20260917', amount: '-50.00', memo: 'Aplicação RDB' }],
+    });
+
+    await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(transferRepository.create).not.toHaveBeenCalled();
+    expect(transactionRepository.create).toHaveBeenCalledTimes(1);
   });
 
   it('não conta novamente uma transação já existente com o mesmo FITID', async () => {
@@ -385,6 +445,8 @@ describe('StatementImportService', () => {
       bankAccountRepository,
       transactionRepository,
       db,
+      investmentAccounts,
+      transferRepository,
     );
 
     const file = statement({
@@ -431,6 +493,8 @@ describe('StatementImportService', () => {
       bankAccountRepository,
       transactionRepository,
       db,
+      investmentAccounts,
+      transferRepository,
     );
 
     const file = statement({

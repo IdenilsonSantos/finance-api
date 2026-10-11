@@ -12,6 +12,8 @@ import { OFXParserService } from './services/ofx-parser.service';
 import { StatementImportService } from './services/statement-import.service';
 import { CategoryInferenceService } from './services/category-inference.service';
 import { InvestmentAccountsService } from './services/investment-accounts.service';
+import { ITransferRepository } from '../core/repositories/transfer.repository.interface';
+import { DrizzleTransferRepository } from '../infrastructure/database/drizzle/repositories/drizzle-transfer.repository';
 
 @Module({
   imports: [WorkspacesModule, ActivityModule],
@@ -24,6 +26,7 @@ import { InvestmentAccountsService } from './services/investment-accounts.servic
     WorkspaceGuard,
     { provide: IBankAccountRepository, useClass: DrizzleBankAccountRepository },
     { provide: ITransactionRepository, useClass: DrizzleTransactionRepository },
+    { provide: ITransferRepository, useClass: DrizzleTransferRepository },
   ],
   controllers: [BankAccountsController],
   exports: [IBankAccountRepository, BankAccountsService, InvestmentAccountsService],
