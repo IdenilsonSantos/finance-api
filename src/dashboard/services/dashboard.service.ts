@@ -297,6 +297,7 @@ export class DashboardService {
           type: a.type,
           balance: a.balance,
           color: a.color,
+          creditLimit: a.creditLimit,
         })),
 
       financialInsights: {

@@ -66,17 +66,22 @@ export const bankAccount = pgTable('bankAccount', {
     .references(() => workspace.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   type: text('type', {
-    enum: ['checking', 'savings', 'investment', 'cash'],
+    enum: ['checking', 'savings', 'investment', 'cash', 'credit_card'],
   })
     .notNull()
     .default('checking'),
   color: text('color').notNull().default('#6366f1'),
+  // Em cartões de crédito o saldo é negativo enquanto houver valor a pagar.
   balance: integer('balance').notNull().default(0),
+  // Cartão de crédito: limite (centavos) e dias de fechamento/vencimento da fatura.
+  creditLimit: integer('creditLimit'),
+  closingDay: integer('closingDay'),
+  dueDay: integer('dueDay'),
+  // Contas arquivadas saem dos seletores e totais, mas mantêm o histórico.
+  archivedAt: timestamp('archivedAt'),
   // Data até a qual o saldo acima está confirmado por extrato importado
   // (LEDGERBAL). Nulo se a conta nunca teve extrato importado.
   balanceAsOf: date('balanceAsOf'),
-  // Contas arquivadas saem dos seletores e totais, mas mantêm o histórico.
-  archivedAt: timestamp('archivedAt'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });
@@ -97,6 +102,10 @@ export const transaction = pgTable('transaction', {
   paymentMethod: text('paymentMethod'),
   date: date('date').notNull(),
   externalId: text('externalId'), // FITID do OFX para deduplicação
+  // Compras parceladas no cartão: todas as parcelas compartilham o grupo.
+  installmentGroupId: uuid('installmentGroupId'),
+  installmentNumber: integer('installmentNumber'),
+  installmentTotal: integer('installmentTotal'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });

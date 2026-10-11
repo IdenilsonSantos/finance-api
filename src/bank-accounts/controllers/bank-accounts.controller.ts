@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseUUIDPipe,
   UseGuards,
   HttpCode,
@@ -29,6 +30,7 @@ import { StatementImportService } from '../services/statement-import.service';
 import {
   AdjustBalanceDto,
   CreateBankAccountDto,
+  InvoiceQueryDto,
   UpdateBankAccountDto,
 } from '../dto/bank-account.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -88,6 +90,19 @@ export class BankAccountsController {
     @Body() dto: UpdateBankAccountDto,
   ) {
     return this.bankAccountsService.update(id, workspaceId, dto, userId);
+  }
+
+  @Get(':id/invoices')
+  @ApiOperation({ summary: 'Credit card invoice (defaults to the open invoice)' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Invoice returned' })
+  @ApiResponse({ status: 400, description: 'Account is not a credit card' })
+  getInvoice(
+    @WorkspaceId() workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: InvoiceQueryDto,
+  ) {
+    return this.bankAccountsService.getInvoice(id, workspaceId, query);
   }
 
   @Post(':id/archive')

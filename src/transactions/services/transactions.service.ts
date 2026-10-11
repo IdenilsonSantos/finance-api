@@ -3,7 +3,10 @@ import {
   Inject,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { addMonths } from 'date-fns';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
@@ -13,10 +16,12 @@ import {
   ListTransactionsDto,
   TransactionsSummaryDto,
 } from '../dto/transaction.dto';
+import { TransactionEntity } from '../../core/entities/transaction.entity';
+import { assertAccountActive } from '../../core/utils/accounts';
+import { parseISODate, toISODate, withClampedDay } from '../../core/utils/date';
 import { ActivityService } from '../../activity/activity.service';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
-import { assertAccountActive } from '../../core/utils/accounts';
 
 const FREE_PLAN_TRANSACTION_LIMIT = 50;
 
@@ -52,18 +57,28 @@ export class TransactionsService {
     if (!account) throw new NotFoundException('Conta bancária não encontrada');
     assertAccountActive(account);
 
+    const { installments = 1, ...data } = dto;
+    if (installments > 1 && (account.type !== 'credit_card' || dto.type !== 'expense')) {
+      throw new BadRequestException('Parcelamento disponível apenas para despesas no cartão de crédito');
+    }
+
     const amountInCents = Math.round(dto.amount * 100);
+    if (installments > amountInCents) {
+      throw new BadRequestException('Valor insuficiente para o número de parcelas');
+    }
 
     const tx = await this.db.transaction(async (trx) => {
-      const created = await this.transactionRepository.create(
-        { ...dto, amount: amountInCents, workspaceId },
-        trx,
-      );
+      const rows = this.buildInstallments(data, amountInCents, installments, workspaceId);
+      const created: TransactionEntity[] = [];
+      for (const row of rows) {
+        created.push(await this.transactionRepository.create(row, trx));
+      }
 
+      // Compra parcelada compromete o limite total de uma vez, como no banco.
       const delta = dto.type === 'income' ? amountInCents : -amountInCents;
       await this.bankAccountRepository.updateBalance(dto.bankAccountId, delta, trx);
 
-      return created;
+      return created[0];
     });
 
     this.activityService.log({
@@ -94,6 +109,37 @@ export class TransactionsService {
       endDate: filters.endDate,
       search: filters.search,
     });
+  }
+
+  /**
+   * Divide o valor total em parcelas mensais. Centavos que sobram da divisão
+   * vão para a primeira parcela (como fazem as operadoras).
+   */
+  private buildInstallments(
+    data: Omit<CreateTransactionDto, 'installments'>,
+    totalInCents: number,
+    installments: number,
+    workspaceId: string,
+  ): Partial<TransactionEntity>[] {
+    if (installments <= 1) {
+      return [{ ...data, amount: totalInCents, workspaceId }];
+    }
+
+    const base = Math.floor(totalInCents / installments);
+    const remainder = totalInCents - base * installments;
+    const groupId = randomUUID();
+    const purchaseDate = parseISODate(data.date);
+    const anchorDay = purchaseDate.getDate();
+
+    return Array.from({ length: installments }, (_, i) => ({
+      ...data,
+      workspaceId,
+      amount: base + (i === 0 ? remainder : 0),
+      date: toISODate(withClampedDay(addMonths(purchaseDate, i), anchorDay)),
+      installmentGroupId: groupId,
+      installmentNumber: i + 1,
+      installmentTotal: installments,
+    }));
   }
 
   async summary(workspaceId: string, filters: TransactionsSummaryDto) {
@@ -159,16 +205,27 @@ export class TransactionsService {
     return updated;
   }
 
-  async remove(id: string, workspaceId: string, userId: string) {
+  async remove(
+    id: string,
+    workspaceId: string,
+    userId: string,
+    scope: 'single' | 'installments' = 'single',
+  ) {
     const tx = await this.findOne(id, workspaceId);
     const account = await this.bankAccountRepository.findById(tx.bankAccountId, workspaceId);
     if (account) assertAccountActive(account);
 
-    await this.db.transaction(async (trx) => {
-      await this.transactionRepository.delete(id, workspaceId, trx);
+    const targets =
+      scope === 'installments' && tx.installmentGroupId
+        ? await this.transactionRepository.findByInstallmentGroup(tx.installmentGroupId, workspaceId)
+        : [tx];
 
-      const delta = tx.type === 'income' ? -tx.amount : tx.amount;
-      await this.bankAccountRepository.updateBalance(tx.bankAccountId, delta, trx);
+    await this.db.transaction(async (trx) => {
+      for (const t of targets) {
+        await this.transactionRepository.delete(t.id, workspaceId, trx);
+        const delta = t.type === 'income' ? -t.amount : t.amount;
+        await this.bankAccountRepository.updateBalance(t.bankAccountId, delta, trx);
+      }
     });
 
     this.activityService.log({

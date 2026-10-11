@@ -34,6 +34,8 @@ export interface TransactionsSummary {
 export interface ITransactionRepository {
   findById(id: string, workspaceId: string): Promise<TransactionEntity | null>;
   findAllByWorkspace(workspaceId: string, filters: ListTransactionsFilters): Promise<PaginatedResult<TransactionEntity>>;
+  /** Todas as parcelas de uma compra parcelada. */
+  findByInstallmentGroup(groupId: string, workspaceId: string): Promise<TransactionEntity[]>;
   /** Totais de receitas/despesas do período, sem lançamentos de ajuste. */
   summarize(workspaceId: string, filters: TransactionsSummaryFilters): Promise<TransactionsSummary>;
   create(data: Partial<TransactionEntity>, trx?: any): Promise<TransactionEntity>;

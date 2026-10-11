@@ -42,6 +42,31 @@ export class CreateTransactionDto {
   @ApiProperty({ example: '2024-01-15' })
   @IsDateString()
   date!: string;
+
+  @ApiPropertyOptional({
+    example: 10,
+    minimum: 1,
+    maximum: 48,
+    description:
+      'Cartão de crédito: número de parcelas. `amount` é o valor TOTAL da compra; ' +
+      'cada parcela é lançada um mês após a anterior, entrando nas faturas seguintes.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(48)
+  installments?: number;
+}
+
+export class DeleteTransactionQueryDto {
+  @ApiPropertyOptional({
+    enum: ['single', 'installments'],
+    description: '`installments` exclui todas as parcelas da compra',
+  })
+  @IsOptional()
+  @IsIn(['single', 'installments'])
+  scope?: 'single' | 'installments';
 }
 
 export class ListTransactionsDto extends PaginationDto {

@@ -26,6 +26,7 @@ import {
   UpdateTransactionDto,
   ListTransactionsDto,
   TransactionsSummaryDto,
+  DeleteTransactionQueryDto,
 } from '../dto/transaction.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
@@ -101,15 +102,17 @@ export class TransactionsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a transaction' })
+  @ApiOperation({ summary: 'Delete a transaction (or all installments of a purchase)' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiQuery({ name: 'scope', required: false, enum: ['single', 'installments'] })
   @ApiResponse({ status: 204, description: 'Transaction deleted' })
   @ApiResponse({ status: 404, description: 'Transaction not found' })
   remove(
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @GetUser('userId') userId: string,
+    @Query() query: DeleteTransactionQueryDto,
   ) {
-    return this.transactionsService.remove(id, workspaceId, userId);
+    return this.transactionsService.remove(id, workspaceId, userId, query.scope);
   }
 }

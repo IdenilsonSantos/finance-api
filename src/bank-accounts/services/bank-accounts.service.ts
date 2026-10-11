@@ -1,15 +1,22 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
-import { count, eq } from 'drizzle-orm';
+import { and, count, eq, gte, lte } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
 import { ADJUSTMENT_CATEGORY } from '../../core/entities/transaction.entity';
 import { todayISO } from '../../core/utils/date';
+import { invoiceMonthForDate, invoicePeriod, shiftMonth } from '../../core/utils/credit-card';
+import { BankAccountEntity, BankAccountType } from '../../core/entities/bank-account.entity';
 import {
   AdjustBalanceDto,
   CreateBankAccountDto,
+  InvoiceQueryDto,
   UpdateBankAccountDto,
 } from '../dto/bank-account.dto';
+
+type CardFields = Pick<BankAccountEntity, 'creditLimit' | 'closingDay' | 'dueDay'>;
+
+export type InvoiceStatus = 'open' | 'closed' | 'paid' | 'overdue';
 import { ActivityService } from '../../activity/activity.service';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
@@ -25,12 +32,34 @@ export class BankAccountsService {
     private readonly activityService: ActivityService,
   ) {}
 
+  /**
+   * Normaliza os campos de cartão: obrigatórios (fechamento/vencimento) para
+   * `credit_card` e zerados para os demais tipos.
+   */
+  private resolveCardFields(type: BankAccountType, fields: Partial<CardFields>): CardFields {
+    if (type !== 'credit_card') {
+      return { creditLimit: null, closingDay: null, dueDay: null };
+    }
+    if (!fields.closingDay || !fields.dueDay) {
+      throw new BadRequestException(
+        'Informe o dia de fechamento e o dia de vencimento da fatura do cartão',
+      );
+    }
+    return {
+      creditLimit: fields.creditLimit ?? null,
+      closingDay: fields.closingDay,
+      dueDay: fields.dueDay,
+    };
+  }
+
   async create(dto: CreateBankAccountDto, workspaceId: string, userId: string) {
-    const { initialBalance, ...rest } = dto;
+    const { initialBalance, creditLimit, closingDay, dueDay, ...rest } = dto;
+    const type = rest.type ?? 'checking';
+    const cardFields = this.resolveCardFields(type, { creditLimit, closingDay, dueDay });
 
     const account = await this.db.transaction(async (trx) => {
       const created = await this.bankAccountRepository.create(
-        { ...rest, workspaceId, balance: 0, color: rest.color ?? '#6366f1' },
+        { ...rest, ...cardFields, type, workspaceId, balance: 0, color: rest.color ?? '#6366f1' },
         trx,
       );
 
@@ -83,8 +112,18 @@ export class BankAccountsService {
   }
 
   async update(id: string, workspaceId: string, dto: UpdateBankAccountDto, userId: string) {
-    await this.findOne(id, workspaceId);
-    const updated = await this.bankAccountRepository.update(id, workspaceId, dto);
+    const current = await this.findOne(id, workspaceId);
+    const { creditLimit, closingDay, dueDay, ...rest } = dto;
+    const type = rest.type ?? current.type;
+    const cardFields = this.resolveCardFields(type, {
+      creditLimit: creditLimit === undefined ? current.creditLimit : creditLimit,
+      closingDay: closingDay ?? current.closingDay,
+      dueDay: dueDay ?? current.dueDay,
+    });
+    const updated = await this.bankAccountRepository.update(id, workspaceId, {
+      ...rest,
+      ...cardFields,
+    });
 
     this.activityService.log({
       workspaceId,
@@ -194,6 +233,69 @@ export class BankAccountsService {
     });
 
     return updated;
+  }
+
+  /**
+   * Fatura do cartão de crédito. O pagamento é registrado como transferência
+   * de outra conta para o cartão; conta como pagamento desta fatura toda
+   * transferência feita entre o fechamento dela e o fechamento seguinte.
+   */
+  async getInvoice(id: string, workspaceId: string, query: InvoiceQueryDto) {
+    const account = await this.findOne(id, workspaceId);
+    if (account.type !== 'credit_card' || !account.closingDay || !account.dueDay) {
+      throw new BadRequestException('Fatura disponível apenas para cartões de crédito');
+    }
+
+    const cycle = { closingDay: account.closingDay, dueDay: account.dueDay };
+    const today = todayISO();
+    const month = query.month ?? invoiceMonthForDate(today, cycle);
+    const period = invoicePeriod(month, cycle);
+    const next = invoicePeriod(shiftMonth(month, 1), cycle);
+
+    const transactions = (
+      await this.transactionRepository.findByBankAccountInDateRange(id, period.start, period.end)
+    )
+      .filter((t) => t.category !== ADJUSTMENT_CATEGORY)
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    const total = transactions.reduce(
+      (acc, t) => acc + (t.type === 'expense' ? t.amount : -t.amount),
+      0,
+    );
+
+    const payments = await this.db
+      .select({ amount: schema.transfer.amount })
+      .from(schema.transfer)
+      .where(
+        and(
+          eq(schema.transfer.toAccountId, id),
+          gte(schema.transfer.date, period.closingDate),
+          lte(schema.transfer.date, next.end),
+        ),
+      );
+    const paidAmount = payments.reduce((acc, p) => acc + p.amount, 0);
+    const remaining = Math.max(0, total - paidAmount);
+
+    let status: InvoiceStatus;
+    if (today < period.closingDate) status = 'open';
+    else if (remaining === 0) status = 'paid';
+    else if (today > period.dueDate) status = 'overdue';
+    else status = 'closed';
+
+    const usedLimit = Math.max(0, -account.balance);
+
+    return {
+      ...period,
+      status,
+      total,
+      paidAmount,
+      remaining,
+      creditLimit: account.creditLimit,
+      usedLimit,
+      availableLimit:
+        account.creditLimit !== null ? Math.max(0, account.creditLimit - usedLimit) : null,
+      transactions,
+    };
   }
 
   async remove(id: string, workspaceId: string, userId: string) {

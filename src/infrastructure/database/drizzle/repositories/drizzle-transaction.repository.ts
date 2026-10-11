@@ -81,6 +81,20 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
     };
   }
 
+  async findByInstallmentGroup(groupId: string, workspaceId: string): Promise<TransactionEntity[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.transaction)
+      .where(
+        and(
+          eq(schema.transaction.installmentGroupId, groupId),
+          eq(schema.transaction.workspaceId, workspaceId),
+        ),
+      )
+      .orderBy(schema.transaction.installmentNumber);
+    return rows.map((r) => new TransactionEntity(r));
+  }
+
   async summarize(
     workspaceId: string,
     filters: TransactionsSummaryFilters,

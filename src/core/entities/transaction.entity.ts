@@ -19,6 +19,9 @@ export class TransactionEntity {
   paymentMethod: string | null;
   date: string; // ISO date string: YYYY-MM-DD
   externalId: string | null;
+  installmentGroupId: string | null;
+  installmentNumber: number | null;
+  installmentTotal: number | null;
   createdAt: Date;
   updatedAt: Date;
 
