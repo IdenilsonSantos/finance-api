@@ -69,6 +69,43 @@ export class CreateTransactionDto {
   installments?: number;
 }
 
+export class ExportTransactionsDto {
+  @ApiPropertyOptional({ example: '2024-01-01' })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({ example: '2024-01-31' })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @ApiPropertyOptional({ enum: ['income', 'expense'] })
+  @IsOptional()
+  @IsIn(['income', 'expense'])
+  type?: TransactionType;
+
+  @ApiPropertyOptional({ example: 'food' })
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  accountId?: string;
+
+  @ApiPropertyOptional({ example: 'mercado' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ enum: TRANSACTION_STATUSES })
+  @IsOptional()
+  @IsIn(TRANSACTION_STATUSES)
+  status?: TransactionStatus;
+}
+
 export class ConvertToTransferDto {
   @ApiPropertyOptional({
     format: 'uuid',

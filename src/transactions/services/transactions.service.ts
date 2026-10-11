@@ -19,7 +19,9 @@ import {
   ListTransactionsDto,
   TransactionsSummaryDto,
   ConvertToTransferDto,
+  ExportTransactionsDto,
 } from '../dto/transaction.dto';
+import { buildTransactionsCsv, EXPORT_MAX_ROWS } from '../utils/transactions-csv';
 import {
   ADJUSTMENT_CATEGORY,
   TransactionEntity,
@@ -187,6 +189,20 @@ export class TransactionsService {
       installmentNumber: i + 1,
       installmentTotal: installments,
     }));
+  }
+
+  /** CSV das transações filtradas, em ordem cronológica (para planilhas). */
+  async exportCsv(workspaceId: string, filters: ExportTransactionsDto): Promise<string> {
+    const [result, accounts] = await Promise.all([
+      this.transactionRepository.findAllByWorkspace(workspaceId, {
+        ...filters,
+        page: 1,
+        limit: EXPORT_MAX_ROWS,
+        order: 'asc',
+      }),
+      this.bankAccountRepository.findAllByWorkspace(workspaceId),
+    ]);
+    return buildTransactionsCsv(result.data, new Map(accounts.map((a) => [a.id, a.name])));
   }
 
   async summary(workspaceId: string, filters: TransactionsSummaryDto) {

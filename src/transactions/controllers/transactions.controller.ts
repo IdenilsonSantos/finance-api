@@ -11,7 +11,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Header,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -28,7 +31,9 @@ import {
   TransactionsSummaryDto,
   DeleteTransactionQueryDto,
   ConvertToTransferDto,
+  ExportTransactionsDto,
 } from '../dto/transaction.dto';
+import { todayISO } from '../../core/utils/date';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../../workspaces/guards/workspace.guard';
 import { WorkspaceId } from '../../workspaces/decorators/workspace-id.decorator';
@@ -68,6 +73,19 @@ export class TransactionsController {
   }
 
   // Deve vir ANTES de /:id
+  @Get('export')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @ApiOperation({ summary: 'Export filtered transactions as CSV (pt-BR spreadsheet format)' })
+  @ApiResponse({ status: 200, description: 'CSV file' })
+  async export(
+    @WorkspaceId() workspaceId: string,
+    @Query() query: ExportTransactionsDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.setHeader('Content-Disposition', `attachment; filename="transacoes-${todayISO()}.csv"`);
+    return this.transactionsService.exportCsv(workspaceId, query);
+  }
+
   @Get('summary')
   @ApiOperation({ summary: 'Income/expense totals for a period (excludes balance adjustments)' })
   @ApiResponse({ status: 200, description: 'Period summary returned' })
