@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, lte, gte, isNull, or, count, SQL } from 'drizzle-orm';
+import { eq, and, lte, isNull, or, count, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { ScheduledTransactionEntity } from '../../../../core/entities/scheduled-transaction.entity';
@@ -35,11 +35,14 @@ export class DrizzleScheduledTransactionRepository
   ): Promise<PaginatedResult<ScheduledTransactionEntity>> {
     const { page, limit, frequency, accountId } = filters;
     const { limit: lim, offset } = paginate(page, limit);
-    const today = new Date().toISOString().slice(0, 10);
-
+    // Inclui ocorrências vencidas ainda não executadas (aparecem como
+    // "atrasadas" no app), mas não recorrências já encerradas.
     const conditions: SQL[] = [
       eq(schema.scheduledTransaction.workspaceId, workspaceId),
-      gte(schema.scheduledTransaction.nextDate, today),
+      or(
+        isNull(schema.scheduledTransaction.endDate),
+        lte(schema.scheduledTransaction.nextDate, schema.scheduledTransaction.endDate),
+      ) as SQL,
     ];
 
     if (frequency) conditions.push(eq(schema.scheduledTransaction.frequency, frequency));
@@ -78,13 +81,38 @@ export class DrizzleScheduledTransactionRepository
       .where(
         and(
           lte(schema.scheduledTransaction.nextDate, upToDate),
+          // Compara com a própria ocorrência (não com hoje) para que
+          // ocorrências atrasadas anteriores ao término ainda sejam executadas.
           or(
             isNull(schema.scheduledTransaction.endDate),
-            gte(schema.scheduledTransaction.endDate, upToDate),
+            lte(schema.scheduledTransaction.nextDate, schema.scheduledTransaction.endDate),
           ),
         ),
       );
     return results.map((r) => new ScheduledTransactionEntity(r));
+  }
+
+  async claimOccurrence(
+    id: string,
+    expectedNextDate: string,
+    newNextDate: string | null,
+    trx: any,
+  ): Promise<boolean> {
+    const where = and(
+      eq(schema.scheduledTransaction.id, id),
+      eq(schema.scheduledTransaction.nextDate, expectedNextDate),
+    );
+    const rows = newNextDate
+      ? await trx
+          .update(schema.scheduledTransaction)
+          .set({ nextDate: newNextDate, updatedAt: new Date() })
+          .where(where)
+          .returning({ id: schema.scheduledTransaction.id })
+      : await trx
+          .delete(schema.scheduledTransaction)
+          .where(where)
+          .returning({ id: schema.scheduledTransaction.id });
+    return rows.length > 0;
   }
 
   async create(
