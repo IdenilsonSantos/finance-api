@@ -24,7 +24,8 @@
     "seed": "ts-node -r tsconfig-paths/register src/scripts/seed.ts",
     "seed:admin": "ts-node -r tsconfig-paths/register src/db/seed-admin.ts",
     "backfill:opening-balances": "ts-node -r tsconfig-paths/register src/scripts/backfill-opening-balances.ts",
-    "convert:investment-movements": "ts-node -r tsconfig-paths/register src/scripts/convert-investment-movements.ts"
+    "convert:investment-movements": "ts-node -r tsconfig-paths/register src/scripts/convert-investment-movements.ts",
+    "recategorize:imported": "ts-node -r tsconfig-paths/register src/scripts/recategorize-imported.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
