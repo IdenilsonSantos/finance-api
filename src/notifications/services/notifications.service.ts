@@ -19,6 +19,7 @@ import {
   goalCompletedTemplate,
   goalDeadlineReminderTemplate,
   budgetAlertTemplate,
+  billsReminderTemplate,
   workspaceInviteTemplate,
   passwordResetTemplate,
   emailVerificationTemplate,
@@ -357,6 +358,21 @@ export class NotificationsService {
         spentAmount: spent,
         budgetAmount: budget,
         month,
+      }),
+    });
+  }
+
+  async sendBillsReminder(params: {
+    to: string;
+    items: { description: string; amount: number; when: string; kind: 'pay' | 'receive' }[];
+    hasOverdue: boolean;
+  }) {
+    await this.emailService.send({
+      to: params.to,
+      subject: params.hasOverdue ? 'Você tem contas atrasadas' : 'Contas vencendo em breve',
+      html: billsReminderTemplate({
+        hasOverdue: params.hasOverdue,
+        items: params.items.map((i) => ({ ...i, amount: formatBRL(i.amount) })),
       }),
     });
   }

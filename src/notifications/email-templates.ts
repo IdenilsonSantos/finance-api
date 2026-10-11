@@ -1,5 +1,15 @@
 const BASE_URL = process.env.APP_URL ?? 'https://financeapp.com';
 
+/** Escapa texto informado pelo usuário antes de inserir no HTML do e-mail. */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function layout(content: string): string {
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -425,5 +435,25 @@ export function budgetAlertTemplate(params: {
       { label: 'Orçamento', value: params.budgetAmount },
     ])}
     ${ctaButton('Ver orçamentos', `${BASE_URL}/budgets`)}
+  `);
+}
+
+export function billsReminderTemplate(params: {
+  items: { description: string; amount: string; when: string; kind: 'pay' | 'receive' }[];
+  hasOverdue: boolean;
+}): string {
+  const rows = params.items.map((item) => ({
+    label: escapeHtml(item.description),
+    value: `<span style="color:${item.kind === 'pay' ? '#991B1B' : '#065F46'};font-weight:700;">${item.amount}</span> · ${item.when}`,
+  }));
+
+  return layout(`
+    ${params.hasOverdue
+      ? badge('#991B1B', '#FEE2E2', '⚠️', 'Conta atrasada')
+      : badge('#92400E', '#FEF3C7', '⏰', 'Vencimento próximo')}
+    ${heading(params.hasOverdue ? 'Você tem contas atrasadas' : 'Contas vencendo')}
+    ${subtext('Confira as contas a pagar e a receber e marque como pagas as que já foram quitadas.')}
+    ${infoCard(rows)}
+    ${ctaButton('Ver contas pendentes', `${BASE_URL}/transactions`)}
   `);
 }
