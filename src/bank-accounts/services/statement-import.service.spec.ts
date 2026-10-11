@@ -161,10 +161,68 @@ describe('StatementImportService', () => {
     expect(transactionRepository.update).toHaveBeenCalledWith(
       'bill-1',
       workspaceId,
-      { status: 'paid', externalId: 'TX9' },
+      { status: 'paid', externalId: 'TX9', date: '2026-08-10' },
       db,
     );
     expect(bankAccountRepository.updateBalance).toHaveBeenCalledWith(bankAccountId, -41000, db);
+  });
+
+  it('efetiva conta pendente paga alguns dias depois, usando a data do pagamento', async () => {
+    transactionRepository.findByBankAccountInDateRange.mockResolvedValue([
+      { id: 'bill-1', date: '2026-08-07', amount: 41000, type: 'expense', status: 'pending', externalId: null },
+    ]);
+    transactionRepository.update.mockResolvedValue({});
+    const file = statement({
+      start: '20260801000000',
+      end: '20260831235959',
+      transactions: [{ fitId: 'TX9', date: '20260810', amount: '-410.00', memo: 'Aluguel' }],
+    });
+
+    const result = await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(result.settled).toBe(1);
+    expect(result.imported).toBe(0);
+    expect(transactionRepository.update).toHaveBeenCalledWith(
+      'bill-1',
+      workspaceId,
+      { status: 'paid', externalId: 'TX9', date: '2026-08-10' },
+      db,
+    );
+  });
+
+  it('não associa conta pendente com mais de 5 dias de diferença', async () => {
+    transactionRepository.findByBankAccountInDateRange.mockResolvedValue([
+      { id: 'bill-1', date: '2026-08-01', amount: 41000, type: 'expense', status: 'pending', externalId: null },
+    ]);
+    const file = statement({
+      start: '20260801000000',
+      end: '20260831235959',
+      transactions: [{ fitId: 'TX9', date: '20260810', amount: '-410.00', memo: 'Aluguel' }],
+    });
+
+    const result = await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(result.settled ?? 0).toBe(0);
+    expect(result.imported).toBe(1);
+    expect(transactionRepository.update).not.toHaveBeenCalled();
+  });
+
+  it('com várias pendentes de mesmo valor, efetiva a de data mais próxima', async () => {
+    transactionRepository.findByBankAccountInDateRange.mockResolvedValue([
+      { id: 'far', date: '2026-08-05', amount: 41000, type: 'expense', status: 'pending', externalId: null },
+      { id: 'near', date: '2026-08-09', amount: 41000, type: 'expense', status: 'pending', externalId: null },
+    ]);
+    transactionRepository.update.mockResolvedValue({});
+    const file = statement({
+      start: '20260801000000',
+      end: '20260831235959',
+      transactions: [{ fitId: 'TX9', date: '20260810', amount: '-410.00', memo: 'Aluguel' }],
+    });
+
+    await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(transactionRepository.update).toHaveBeenCalledTimes(1);
+    expect(transactionRepository.update.mock.calls[0][0]).toBe('near');
   });
 
   it('prefere a transação já paga ao deduplicar, deixando a pendente intacta', async () => {

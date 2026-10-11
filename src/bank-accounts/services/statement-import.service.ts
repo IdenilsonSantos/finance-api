@@ -14,6 +14,14 @@ import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 import { TransactionEntity, balanceEffect } from '../../core/entities/transaction.entity';
 import { assertAccountActive } from '../../core/utils/accounts';
+import { addDays, differenceInCalendarDays } from 'date-fns';
+import { parseISODate, toISODate } from '../../core/utils/date';
+
+/**
+ * Tolerância (dias) para reconhecer no extrato uma conta pendente paga antes
+ * ou depois da data cadastrada (ex.: boleto pago com atraso).
+ */
+const PENDING_MATCH_WINDOW_DAYS = 5;
 
 
 export interface ImportResult {
@@ -211,8 +219,8 @@ export class StatementImportService {
     // e lançamentos manuais que já representam a mesma movimentação.
     const existingInPeriod = await this.transactionRepository.findByBankAccountInDateRange(
       resolvedAccountId,
-      periodStart,
-      periodEnd,
+      toISODate(addDays(parseISODate(periodStart), -PENDING_MATCH_WINDOW_DAYS)),
+      toISODate(addDays(parseISODate(periodEnd), PENDING_MATCH_WINDOW_DAYS)),
     );
     // Pagas primeiro: uma linha do extrato só "consome" uma conta pendente
     // quando não há lançamento já efetivado equivalente.
@@ -227,8 +235,23 @@ export class StatementImportService {
     const newTransactions: OFXTransaction[] = [];
     // Contas pendentes que o extrato mostra como pagas: são efetivadas (e
     // passam a contar no saldo) em vez de virar duplicata descartada.
-    const toSettle: { tx: TransactionEntity; fitId: string }[] = [];
+    const toSettle: { tx: TransactionEntity; fitId: string; date: string }[] = [];
+    const consumed = new Set<string>();
     let duplicates = 0;
+
+    // 3) Conta pendente de mesmo valor e tipo paga alguns dias antes/depois:
+    // escolhe a de data mais próxima dentro da tolerância.
+    const nearestPending = (t: OFXTransaction): TransactionEntity | undefined => {
+      let best: { tx: TransactionEntity; distance: number } | undefined;
+      for (const tx of existingInPeriod) {
+        if (tx.status !== 'pending' || consumed.has(tx.id)) continue;
+        if (tx.amount !== t.amountInCents || tx.type !== t.type) continue;
+        const distance = Math.abs(differenceInCalendarDays(parseISODate(tx.date), parseISODate(t.date)));
+        if (distance > PENDING_MATCH_WINDOW_DAYS) continue;
+        if (!best || distance < best.distance) best = { tx, distance };
+      }
+      return best?.tx;
+    };
 
     for (const t of parsed) {
       if (existingFitIdSet.has(t.fitId)) {
@@ -237,10 +260,19 @@ export class StatementImportService {
       }
 
       const key = fuzzyKey({ date: t.date, amount: t.amountInCents, type: t.type });
-      const match = fuzzyPool.get(key)?.shift();
+      let match = fuzzyPool.get(key)?.shift();
+      while (match && consumed.has(match.id)) match = fuzzyPool.get(key)?.shift();
       if (match) {
-        if (match.status === 'pending') toSettle.push({ tx: match, fitId: t.fitId });
+        consumed.add(match.id);
+        if (match.status === 'pending') toSettle.push({ tx: match, fitId: t.fitId, date: t.date });
         else duplicates++;
+        continue;
+      }
+
+      const pending = nearestPending(t);
+      if (pending) {
+        consumed.add(pending.id);
+        toSettle.push({ tx: pending, fitId: t.fitId, date: t.date });
         continue;
       }
 
@@ -285,7 +317,7 @@ export class StatementImportService {
             0,
           ) +
         toSettle
-          .filter(({ tx }) => tx.date <= periodEnd)
+          .filter(({ date }) => date <= periodEnd)
           .reduce((sum, { tx }) => sum + balanceEffect({ ...tx, status: 'paid' }), 0);
 
       calculatedBalance = balanceBeforeImport + newDeltaUpToPeriodEnd;
@@ -336,11 +368,12 @@ export class StatementImportService {
         totalDelta += t.type === 'income' ? t.amountInCents : -t.amountInCents;
       }
 
-      for (const { tx, fitId } of toSettle) {
+      for (const { tx, fitId, date } of toSettle) {
+        // A data passa a ser a do pagamento informada pelo banco.
         await this.transactionRepository.update(
           tx.id,
           workspaceId,
-          { status: 'paid', externalId: fitId },
+          { status: 'paid', externalId: fitId, date },
           trx,
         );
         totalDelta += balanceEffect({ ...tx, status: 'paid' });
