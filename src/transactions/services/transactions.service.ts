@@ -2,7 +2,6 @@ import {
   Injectable,
   Inject,
   NotFoundException,
-  ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
@@ -23,8 +22,6 @@ import { ActivityService } from '../../activity/activity.service';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 
-const FREE_PLAN_TRANSACTION_LIMIT = 50;
-
 @Injectable()
 export class TransactionsService {
   constructor(
@@ -37,19 +34,6 @@ export class TransactionsService {
   ) {}
 
   async create(dto: CreateTransactionDto, workspaceId: string, userId: string) {
-    const now = new Date();
-    const count = await this.transactionRepository.countByWorkspaceAndMonth(
-      workspaceId,
-      now.getFullYear(),
-      now.getMonth() + 1,
-    );
-
-    /* if (count >= FREE_PLAN_TRANSACTION_LIMIT) {
-      throw new ForbiddenException(
-        'Limite de transações do plano atingido. Faça upgrade para continuar.',
-      );
-    } */
-
     const account = await this.bankAccountRepository.findById(
       dto.bankAccountId,
       workspaceId,

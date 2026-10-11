@@ -170,28 +170,6 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
       );
   }
 
-  async countByWorkspaceAndMonth(
-    workspaceId: string,
-    year: number,
-    month: number,
-  ): Promise<number> {
-    const start = new Date(year, month - 1, 1).toISOString().slice(0, 10);
-    const end = new Date(year, month, 0).toISOString().slice(0, 10);
-
-    const [result] = await this.db
-      .select({ count: count() })
-      .from(schema.transaction)
-      .where(
-        and(
-          eq(schema.transaction.workspaceId, workspaceId),
-          gte(schema.transaction.date, start),
-          lte(schema.transaction.date, end),
-        ),
-      );
-
-    return Number(result?.count ?? 0);
-  }
-
   async findExternalIdsByBankAccount(
     bankAccountId: string,
     fitIds: string[],

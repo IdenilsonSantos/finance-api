@@ -12,7 +12,6 @@ describe('TransactionsService', () => {
 
   beforeEach(() => {
     transactionRepo = {
-      countByWorkspaceAndMonth: jest.fn().mockResolvedValue(0),
       create: jest.fn(async (data: any) => ({ id: `tx-${data.installmentNumber ?? 1}`, ...data })),
       findById: jest.fn(),
       findByInstallmentGroup: jest.fn(),
