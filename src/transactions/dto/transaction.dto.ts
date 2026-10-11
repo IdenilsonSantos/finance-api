@@ -1,7 +1,8 @@
 import { IsString, IsIn, IsNumber, IsPositive, IsDateString, IsUUID, IsOptional, IsInt, Min, Max, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import type { TransactionType } from '../../core/entities/transaction.entity';
+import { TRANSACTION_STATUSES } from '../../core/entities/transaction.entity';
+import type { TransactionStatus, TransactionType } from '../../core/entities/transaction.entity';
 import { PaginationDto } from '../../core/dto/pagination.dto';
 
 export class CreateTransactionDto {
@@ -42,6 +43,15 @@ export class CreateTransactionDto {
   @ApiProperty({ example: '2024-01-15' })
   @IsDateString()
   date!: string;
+
+  @ApiPropertyOptional({
+    enum: TRANSACTION_STATUSES,
+    default: 'paid',
+    description: '`pending` = conta a pagar/receber, não altera o saldo até ser efetivada',
+  })
+  @IsOptional()
+  @IsIn(TRANSACTION_STATUSES)
+  status?: TransactionStatus;
 
   @ApiPropertyOptional({
     example: 10,
@@ -110,6 +120,11 @@ export class ListTransactionsDto extends PaginationDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ enum: TRANSACTION_STATUSES })
+  @IsOptional()
+  @IsIn(TRANSACTION_STATUSES)
+  status?: TransactionStatus;
 }
 
 export class TransactionsSummaryDto {
@@ -176,4 +191,9 @@ export class UpdateTransactionDto {
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  @ApiPropertyOptional({ enum: TRANSACTION_STATUSES, description: '`paid` efetiva uma conta pendente' })
+  @IsOptional()
+  @IsIn(TRANSACTION_STATUSES)
+  status?: TransactionStatus;
 }

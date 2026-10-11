@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { eq, or, sql } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import { format } from 'date-fns';
 import * as schema from '../db/schema';
 import { ADJUSTMENT_CATEGORY } from '../core/entities/transaction.entity';
@@ -32,7 +32,8 @@ async function main() {
         firstDate: sql<string | null>`min(${schema.transaction.date})`,
       })
       .from(schema.transaction)
-      .where(eq(schema.transaction.bankAccountId, account.id));
+      // Pendentes (contas a pagar/receber) ainda não movimentaram o saldo.
+      .where(and(eq(schema.transaction.bankAccountId, account.id), eq(schema.transaction.status, 'paid')));
 
     const [tr] = await db
       .select({

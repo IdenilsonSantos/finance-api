@@ -2,7 +2,6 @@ import {
   Injectable,
   Inject,
   NotFoundException,
-  ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
@@ -16,14 +15,12 @@ import {
   ListTransactionsDto,
   TransactionsSummaryDto,
 } from '../dto/transaction.dto';
-import { TransactionEntity } from '../../core/entities/transaction.entity';
+import { TransactionEntity, balanceEffect } from '../../core/entities/transaction.entity';
 import { assertAccountActive } from '../../core/utils/accounts';
-import { parseISODate, toISODate, withClampedDay } from '../../core/utils/date';
+import { parseISODate, toISODate, todayISO, withClampedDay } from '../../core/utils/date';
 import { ActivityService } from '../../activity/activity.service';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
-
-const FREE_PLAN_TRANSACTION_LIMIT = 50;
 
 @Injectable()
 export class TransactionsService {
@@ -37,19 +34,6 @@ export class TransactionsService {
   ) {}
 
   async create(dto: CreateTransactionDto, workspaceId: string, userId: string) {
-    const now = new Date();
-    const count = await this.transactionRepository.countByWorkspaceAndMonth(
-      workspaceId,
-      now.getFullYear(),
-      now.getMonth() + 1,
-    );
-
-    /* if (count >= FREE_PLAN_TRANSACTION_LIMIT) {
-      throw new ForbiddenException(
-        'Limite de transações do plano atingido. Faça upgrade para continuar.',
-      );
-    } */
-
     const account = await this.bankAccountRepository.findById(
       dto.bankAccountId,
       workspaceId,
@@ -61,6 +45,8 @@ export class TransactionsService {
     if (installments > 1 && (account.type !== 'credit_card' || dto.type !== 'expense')) {
       throw new BadRequestException('Parcelamento disponível apenas para despesas no cartão de crédito');
     }
+    const status = dto.status ?? 'paid';
+    this.assertStatusAllowed(account.type, status);
 
     const amountInCents = Math.round(dto.amount * 100);
     if (installments > amountInCents) {
@@ -68,15 +54,18 @@ export class TransactionsService {
     }
 
     const tx = await this.db.transaction(async (trx) => {
-      const rows = this.buildInstallments(data, amountInCents, installments, workspaceId);
+      const rows = this.buildInstallments({ ...data, status }, amountInCents, installments, workspaceId);
       const created: TransactionEntity[] = [];
       for (const row of rows) {
         created.push(await this.transactionRepository.create(row, trx));
       }
 
       // Compra parcelada compromete o limite total de uma vez, como no banco.
-      const delta = dto.type === 'income' ? amountInCents : -amountInCents;
-      await this.bankAccountRepository.updateBalance(dto.bankAccountId, delta, trx);
+      // Contas pendentes só movimentam o saldo quando forem efetivadas.
+      const delta = balanceEffect({ type: dto.type, amount: amountInCents, status });
+      if (delta !== 0) {
+        await this.bankAccountRepository.updateBalance(dto.bankAccountId, delta, trx);
+      }
 
       return created[0];
     });
@@ -108,7 +97,20 @@ export class TransactionsService {
       startDate: filters.startDate,
       endDate: filters.endDate,
       search: filters.search,
+      status: filters.status,
     });
+  }
+
+  /**
+   * Cartão de crédito não tem "pendente": a compra já consome o limite e entra
+   * na fatura; o que fica a pagar é a própria fatura.
+   */
+  private assertStatusAllowed(accountType: string, status: string) {
+    if (accountType === 'credit_card' && status === 'pending') {
+      throw new BadRequestException(
+        'Compras no cartão de crédito não podem ficar pendentes: elas entram na fatura',
+      );
+    }
   }
 
   /**
@@ -147,6 +149,7 @@ export class TransactionsService {
       startDate: filters.startDate,
       endDate: filters.endDate,
       accountId: filters.accountId,
+      today: todayISO(),
     });
   }
 
@@ -163,22 +166,32 @@ export class TransactionsService {
     // alteraria o saldo dela (updateBalance não filtra por workspace).
     const oldAccount = await this.bankAccountRepository.findById(old.bankAccountId, workspaceId);
     if (oldAccount) assertAccountActive(oldAccount);
+    let targetAccount = oldAccount;
     if (dto.bankAccountId && dto.bankAccountId !== old.bankAccountId) {
       const target = await this.bankAccountRepository.findById(dto.bankAccountId, workspaceId);
       if (!target) throw new NotFoundException('Conta bancária não encontrada');
       assertAccountActive(target);
+      targetAccount = target;
     }
 
     const newBankAccountId = dto.bankAccountId ?? old.bankAccountId;
     const newAmountInCents = dto.amount !== undefined ? Math.round(dto.amount * 100) : old.amount;
     const newType = dto.type ?? old.type;
+    const newStatus = dto.status ?? old.status;
+    if (targetAccount) this.assertStatusAllowed(targetAccount.type, newStatus);
 
     const updated = await this.db.transaction(async (trx) => {
-      const oldDelta = old.type === 'income' ? -old.amount : old.amount;
-      await this.bankAccountRepository.updateBalance(old.bankAccountId, oldDelta, trx);
+      // Desfaz o efeito antigo e aplica o novo; pendentes não têm efeito, então
+      // efetivar (pending -> paid) só aplica o valor agora.
+      const oldDelta = -balanceEffect(old);
+      if (oldDelta !== 0) {
+        await this.bankAccountRepository.updateBalance(old.bankAccountId, oldDelta, trx);
+      }
 
-      const newDelta = newType === 'income' ? newAmountInCents : -newAmountInCents;
-      await this.bankAccountRepository.updateBalance(newBankAccountId, newDelta, trx);
+      const newDelta = balanceEffect({ type: newType, amount: newAmountInCents, status: newStatus });
+      if (newDelta !== 0) {
+        await this.bankAccountRepository.updateBalance(newBankAccountId, newDelta, trx);
+      }
 
       return this.transactionRepository.update(
         id,
@@ -188,6 +201,7 @@ export class TransactionsService {
           amount: newAmountInCents,
           bankAccountId: newBankAccountId,
           type: newType,
+          status: newStatus,
         },
         trx,
       );
@@ -223,8 +237,10 @@ export class TransactionsService {
     await this.db.transaction(async (trx) => {
       for (const t of targets) {
         await this.transactionRepository.delete(t.id, workspaceId, trx);
-        const delta = t.type === 'income' ? -t.amount : t.amount;
-        await this.bankAccountRepository.updateBalance(t.bankAccountId, delta, trx);
+        const delta = -balanceEffect(t);
+        if (delta !== 0) {
+          await this.bankAccountRepository.updateBalance(t.bankAccountId, delta, trx);
+        }
       }
     });
 

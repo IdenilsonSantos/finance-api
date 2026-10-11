@@ -96,7 +96,6 @@ describe('StatementImportService', () => {
       create: jest.fn().mockResolvedValue({}),
       update: jest.fn(),
       delete: jest.fn(),
-      countByWorkspaceAndMonth: jest.fn().mockResolvedValue(0),
       findExternalIdsByBankAccount: jest.fn().mockResolvedValue([]),
       findByBankAccountInDateRange: jest.fn().mockResolvedValue([]),
       sumBalanceByBankAccountUpToDate: jest.fn().mockResolvedValue(0),
@@ -143,22 +142,47 @@ describe('StatementImportService', () => {
     expect(transactionRepository.create).toHaveBeenCalledTimes(60);
   });
 
-  it('importa normalmente quando o mês já tem mais de 50 transações', async () => {
-    transactionRepository.countByWorkspaceAndMonth.mockResolvedValue(60);
+  it('efetiva uma conta pendente que aparece paga no extrato, em vez de descartá-la', async () => {
+    transactionRepository.findByBankAccountInDateRange.mockResolvedValue([
+      { id: 'bill-1', date: '2026-08-10', amount: 41000, type: 'expense', status: 'pending', externalId: null },
+    ]);
+    transactionRepository.update.mockResolvedValue({});
     const file = statement({
       start: '20260801000000',
       end: '20260831235959',
-      transactions: [
-        { fitId: 'TX1', date: '20260805', amount: '1000.00', memo: 'Salário' },
-        { fitId: 'TX2', date: '20260810', amount: '-410.00', memo: 'Aluguel' },
-        { fitId: 'TX3', date: '20260812', amount: '-35.90', memo: 'Farmácia' },
-      ],
+      transactions: [{ fitId: 'TX9', date: '20260810', amount: '-410.00', memo: 'Aluguel' }],
     });
 
     const result = await service.importOFX(bankAccountId, workspaceId, file);
 
-    expect(result.imported).toBe(3);
-    expect(transactionRepository.create).toHaveBeenCalledTimes(3);
+    expect(result.imported).toBe(0);
+    expect(result.settled).toBe(1);
+    expect(transactionRepository.create).not.toHaveBeenCalled();
+    expect(transactionRepository.update).toHaveBeenCalledWith(
+      'bill-1',
+      workspaceId,
+      { status: 'paid', externalId: 'TX9' },
+      db,
+    );
+    expect(bankAccountRepository.updateBalance).toHaveBeenCalledWith(bankAccountId, -41000, db);
+  });
+
+  it('prefere a transação já paga ao deduplicar, deixando a pendente intacta', async () => {
+    transactionRepository.findByBankAccountInDateRange.mockResolvedValue([
+      { id: 'bill-1', date: '2026-08-10', amount: 41000, type: 'expense', status: 'pending', externalId: null },
+      { id: 'paid-1', date: '2026-08-10', amount: 41000, type: 'expense', status: 'paid', externalId: null },
+    ]);
+    const file = statement({
+      start: '20260801000000',
+      end: '20260831235959',
+      transactions: [{ fitId: 'TX9', date: '20260810', amount: '-410.00', memo: 'Aluguel' }],
+    });
+
+    const result = await service.importOFX(bankAccountId, workspaceId, file);
+
+    expect(result.duplicates).toBe(1);
+    expect(result.settled ?? 0).toBe(0);
+    expect(transactionRepository.update).not.toHaveBeenCalled();
   });
 
   it('não conta novamente uma transação já existente com o mesmo FITID', async () => {

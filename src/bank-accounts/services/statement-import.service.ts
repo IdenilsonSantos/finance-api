@@ -12,12 +12,15 @@ import { IBankAccountRepository } from '../../core/repositories/bank-account.rep
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
+import { TransactionEntity, balanceEffect } from '../../core/entities/transaction.entity';
 import { assertAccountActive } from '../../core/utils/accounts';
 
 
 export interface ImportResult {
   imported: number;
   duplicates: number;
+  /** Contas pendentes que apareceram pagas no extrato e foram efetivadas. */
+  settled?: number;
   total: number;
   accountCreated?: boolean;
   accountName?: string;
@@ -211,13 +214,20 @@ export class StatementImportService {
       periodStart,
       periodEnd,
     );
-    const fuzzyPool = new Map<string, number>();
-    for (const tx of existingInPeriod) {
+    // Pagas primeiro: uma linha do extrato só "consome" uma conta pendente
+    // quando não há lançamento já efetivado equivalente.
+    const fuzzyPool = new Map<string, TransactionEntity[]>();
+    for (const tx of [...existingInPeriod].sort(
+      (a, b) => Number(a.status === 'pending') - Number(b.status === 'pending'),
+    )) {
       const key = fuzzyKey(tx);
-      fuzzyPool.set(key, (fuzzyPool.get(key) ?? 0) + 1);
+      fuzzyPool.set(key, [...(fuzzyPool.get(key) ?? []), tx]);
     }
 
     const newTransactions: OFXTransaction[] = [];
+    // Contas pendentes que o extrato mostra como pagas: são efetivadas (e
+    // passam a contar no saldo) em vez de virar duplicata descartada.
+    const toSettle: { tx: TransactionEntity; fitId: string }[] = [];
     let duplicates = 0;
 
     for (const t of parsed) {
@@ -227,17 +237,17 @@ export class StatementImportService {
       }
 
       const key = fuzzyKey({ date: t.date, amount: t.amountInCents, type: t.type });
-      const remaining = fuzzyPool.get(key) ?? 0;
-      if (remaining > 0) {
-        fuzzyPool.set(key, remaining - 1);
-        duplicates++;
+      const match = fuzzyPool.get(key)?.shift();
+      if (match) {
+        if (match.status === 'pending') toSettle.push({ tx: match, fitId: t.fitId });
+        else duplicates++;
         continue;
       }
 
       newTransactions.push(t);
     }
 
-    if (newTransactions.length === 0) {
+    if (newTransactions.length === 0 && toSettle.length === 0) {
       return {
         imported: 0,
         duplicates,
@@ -267,12 +277,16 @@ export class StatementImportService {
           resolvedAccountId,
           periodEnd,
         );
-      const newDeltaUpToPeriodEnd = newTransactions
-        .filter((t) => t.date <= periodEnd)
-        .reduce(
-          (sum, t) => sum + (t.type === 'income' ? t.amountInCents : -t.amountInCents),
-          0,
-        );
+      const newDeltaUpToPeriodEnd =
+        newTransactions
+          .filter((t) => t.date <= periodEnd)
+          .reduce(
+            (sum, t) => sum + (t.type === 'income' ? t.amountInCents : -t.amountInCents),
+            0,
+          ) +
+        toSettle
+          .filter(({ tx }) => tx.date <= periodEnd)
+          .reduce((sum, { tx }) => sum + balanceEffect({ ...tx, status: 'paid' }), 0);
 
       calculatedBalance = balanceBeforeImport + newDeltaUpToPeriodEnd;
       bankBalance = ledgerBalance.amountInCents;
@@ -320,6 +334,16 @@ export class StatementImportService {
           trx,
         );
         totalDelta += t.type === 'income' ? t.amountInCents : -t.amountInCents;
+      }
+
+      for (const { tx, fitId } of toSettle) {
+        await this.transactionRepository.update(
+          tx.id,
+          workspaceId,
+          { status: 'paid', externalId: fitId },
+          trx,
+        );
+        totalDelta += balanceEffect({ ...tx, status: 'paid' });
       }
 
       if (shouldAdjust && divergence !== undefined) {
@@ -385,6 +409,7 @@ export class StatementImportService {
     return {
       imported: newTransactions.length,
       duplicates,
+      settled: toSettle.length,
       total: parsed.length,
       accountCreated,
       accountName: accountCreated ? (accountInfo?.name ?? 'Conta Importada') : undefined,
