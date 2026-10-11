@@ -457,3 +457,22 @@ export function billsReminderTemplate(params: {
     ${ctaButton('Ver contas pendentes', `${BASE_URL}/transactions`)}
   `);
 }
+
+export function invoiceDueTemplate(params: {
+  cardName: string;
+  amount: string;
+  dueDate: string;
+  when: string;
+}): string {
+  return layout(`
+    ${badge('#92400E', '#FEF3C7', '💳', 'Fatura do cartão')}
+    ${heading(`Sua fatura ${params.when}`)}
+    ${subtext(`A fatura do cartão <strong style="color:#111827;">${escapeHtml(params.cardName)}</strong> está fechada e ainda não foi paga.`)}
+    ${infoCard([
+      { label: 'Cartão', value: escapeHtml(params.cardName) },
+      { label: 'Valor a pagar', value: `<span style="color:#991B1B;font-weight:700;">${params.amount}</span>` },
+      { label: 'Vencimento', value: params.dueDate },
+    ])}
+    ${ctaButton('Ver fatura', `${BASE_URL}/wallets`)}
+  `);
+}

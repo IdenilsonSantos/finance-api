@@ -20,6 +20,7 @@ import {
   goalDeadlineReminderTemplate,
   budgetAlertTemplate,
   billsReminderTemplate,
+  invoiceDueTemplate,
   workspaceInviteTemplate,
   passwordResetTemplate,
   emailVerificationTemplate,
@@ -373,6 +374,25 @@ export class NotificationsService {
       html: billsReminderTemplate({
         hasOverdue: params.hasOverdue,
         items: params.items.map((i) => ({ ...i, amount: formatBRL(i.amount) })),
+      }),
+    });
+  }
+
+  async sendInvoiceDue(params: {
+    to: string;
+    cardName: string;
+    amount: number;
+    dueDate: string;
+    when: string;
+  }) {
+    await this.emailService.send({
+      to: params.to,
+      subject: `Fatura do ${params.cardName} ${params.when}`,
+      html: invoiceDueTemplate({
+        cardName: params.cardName,
+        amount: formatBRL(params.amount),
+        dueDate: formatDate(params.dueDate),
+        when: params.when,
       }),
     });
   }

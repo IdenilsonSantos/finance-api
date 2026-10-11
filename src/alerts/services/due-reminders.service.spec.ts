@@ -1,4 +1,10 @@
-import { buildBillsReminder, DueRemindersService, PendingBill, reminderDates } from './due-reminders.service';
+import {
+  buildBillsReminder,
+  DueRemindersService,
+  invoicesDueForReminder,
+  PendingBill,
+  reminderDates,
+} from './due-reminders.service';
 import * as dateUtils from '../../core/utils/date';
 
 const bill = (overrides: Partial<PendingBill>): PendingBill => ({
@@ -58,7 +64,7 @@ describe('DueRemindersService.handleBillReminders', () => {
   it('envia um lembrete por workspace', async () => {
     jest.spyOn(dateUtils, 'todayISO').mockReturnValue('2024-03-10');
     const notifications = { notifyWorkspace: jest.fn().mockResolvedValue(undefined), sendBillsReminder: jest.fn() };
-    const service = new DueRemindersService({} as any, notifications as any);
+    const service = new DueRemindersService({} as any, notifications as any, {} as any);
     const find = jest
       .spyOn(service as any, 'findPendingBills')
       .mockResolvedValue([bill({}), bill({ description: 'Luz' }), bill({ workspaceId: 'ws-2' })]);
@@ -73,5 +79,60 @@ describe('DueRemindersService.handleBillReminders', () => {
       expect.objectContaining({ title: '2 contas vencendo' }),
       expect.any(Function),
     );
+  });
+});
+
+describe('invoicesDueForReminder', () => {
+  const cycle = { closingDay: 25, dueDay: 5 };
+
+  it('lembra 3 dias antes e no dia do vencimento', () => {
+    expect(invoicesDueForReminder(cycle, '2024-03-02')).toEqual([
+      { month: '2024-03', dueDate: '2024-03-05', when: 'vence em 3 dias' },
+    ]);
+    expect(invoicesDueForReminder(cycle, '2024-03-05')).toEqual([
+      { month: '2024-03', dueDate: '2024-03-05', when: 'vence hoje' },
+    ]);
+    expect(invoicesDueForReminder(cycle, '2024-03-04')).toEqual([]);
+  });
+
+  it('o lembrete antecipado pode cair no mês anterior ao vencimento', () => {
+    expect(invoicesDueForReminder({ closingDay: 20, dueDay: 1 }, '2024-03-29')).toEqual([
+      { month: '2024-04', dueDate: '2024-04-01', when: 'vence em 3 dias' },
+    ]);
+  });
+});
+
+describe('DueRemindersService.handleInvoiceReminders', () => {
+  function setup(invoice: any) {
+    jest.spyOn(dateUtils, 'todayISO').mockReturnValue('2024-03-05');
+    const notifications = { notifyWorkspace: jest.fn().mockResolvedValue(undefined), sendInvoiceDue: jest.fn() };
+    const bankAccounts = { getInvoice: jest.fn().mockResolvedValue(invoice) };
+    const service = new DueRemindersService({} as any, notifications as any, bankAccounts as any);
+    jest.spyOn(service as any, 'findActiveCards').mockResolvedValue([
+      { id: 'card-1', workspaceId: 'ws-1', name: 'Nubank', closingDay: 25, dueDay: 5 },
+    ]);
+    return { service, notifications, bankAccounts };
+  }
+
+  it('avisa a fatura fechada e não paga', async () => {
+    const { service, notifications, bankAccounts } = setup({ status: 'closed', remaining: 123456 });
+
+    await service.handleInvoiceReminders();
+
+    expect(bankAccounts.getInvoice).toHaveBeenCalledWith('card-1', 'ws-1', { month: '2024-03' });
+    expect(notifications.notifyWorkspace).toHaveBeenCalledWith(
+      'ws-1',
+      'invoiceReminder',
+      expect.objectContaining({ title: 'Fatura do Nubank vence hoje' }),
+      expect.any(Function),
+    );
+  });
+
+  it('não avisa fatura já paga', async () => {
+    const { service, notifications } = setup({ status: 'paid', remaining: 0 });
+
+    await service.handleInvoiceReminders();
+
+    expect(notifications.notifyWorkspace).not.toHaveBeenCalled();
   });
 });

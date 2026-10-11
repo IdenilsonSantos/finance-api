@@ -1,13 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { addDays } from 'date-fns';
+import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { addDays, format } from 'date-fns';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 import { APP_TIMEZONE, parseISODate, toISODate, todayISO } from '../../core/utils/date';
 import { categoryLabel } from '../../core/utils/categories';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { BankAccountsService } from '../../bank-accounts/services/bank-accounts.service';
+import { CardCycle, invoicePeriod } from '../../core/utils/credit-card';
 
 /** Antecedência do primeiro lembrete de vencimento. */
 export const REMINDER_DAYS_BEFORE = 3;
@@ -69,6 +71,23 @@ export function buildBillsReminder(bills: PendingBill[], today: string) {
   return { title, body, items, hasOverdue };
 }
 
+/**
+ * Faturas do cartão que pedem lembrete hoje: as que vencem hoje ou em
+ * REMINDER_DAYS_BEFORE dias (a fatura é identificada pelo mês do vencimento).
+ */
+export function invoicesDueForReminder(cycle: CardCycle, today: string) {
+  const { soon } = reminderDates(today);
+  const months = [...new Set([today.slice(0, 7), soon.slice(0, 7)])];
+  return months
+    .map((month) => invoicePeriod(month, cycle))
+    .filter((p) => p.dueDate === today || p.dueDate === soon)
+    .map((p) => ({
+      month: p.month,
+      dueDate: p.dueDate,
+      when: p.dueDate === today ? 'vence hoje' : `vence em ${REMINDER_DAYS_BEFORE} dias`,
+    }));
+}
+
 @Injectable()
 export class DueRemindersService {
   private readonly logger = new Logger(DueRemindersService.name);
@@ -76,7 +95,70 @@ export class DueRemindersService {
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly notificationsService: NotificationsService,
+    private readonly bankAccountsService: BankAccountsService,
   ) {}
+
+  @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: APP_TIMEZONE })
+  async handleInvoiceReminders(): Promise<void> {
+    const today = todayISO();
+    const cards = await this.findActiveCards();
+    let sent = 0;
+
+    for (const card of cards) {
+      const due = invoicesDueForReminder({ closingDay: card.closingDay!, dueDay: card.dueDay! }, today);
+      for (const { month, dueDate, when } of due) {
+        try {
+          const invoice = await this.bankAccountsService.getInvoice(card.id, card.workspaceId, { month });
+          if (invoice.status === 'paid' || invoice.remaining <= 0) continue;
+
+          await this.notificationsService.notifyWorkspace(
+            card.workspaceId,
+            'invoiceReminder',
+            {
+              title: `Fatura do ${card.name} ${when}`,
+              body: `Valor a pagar: ${formatBRL(invoice.remaining)}. Vencimento em ${format(parseISODate(dueDate), 'dd/MM')}.`,
+            },
+            (email) =>
+              this.notificationsService.sendInvoiceDue({
+                to: email,
+                cardName: card.name,
+                amount: invoice.remaining,
+                dueDate,
+                when,
+              }),
+          );
+          sent++;
+        } catch (err) {
+          this.logger.error(
+            `Falha no lembrete da fatura ${month} do cartão ${card.id}`,
+            err instanceof Error ? err.stack : String(err),
+          );
+        }
+      }
+    }
+
+    this.logger.log(`Lembrete de faturas: ${sent} fatura(s) de ${cards.length} cartão(ões)`);
+  }
+
+  private async findActiveCards() {
+    return this.db
+      .select({
+        id: schema.bankAccount.id,
+        workspaceId: schema.bankAccount.workspaceId,
+        name: schema.bankAccount.name,
+        closingDay: schema.bankAccount.closingDay,
+        dueDay: schema.bankAccount.dueDay,
+      })
+      .from(schema.bankAccount)
+      .where(
+        and(
+          eq(schema.bankAccount.type, 'credit_card'),
+          isNull(schema.bankAccount.archivedAt),
+          isNotNull(schema.bankAccount.closingDay),
+          isNotNull(schema.bankAccount.dueDay),
+        ),
+      );
+  }
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: APP_TIMEZONE })
   async handleBillReminders(): Promise<void> {
