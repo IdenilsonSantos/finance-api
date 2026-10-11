@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gte, lte, count, inArray, isNotNull, ilike, or, sql, SQL, desc, ne } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, count, inArray, isNotNull, ilike, or, sql, SQL, asc, desc, ne } from 'drizzle-orm';
 import { DRIZZLE } from '../../../../db/database.module';
 import * as schema from '../../../../db/schema';
 import { TransactionEntity, ADJUSTMENT_CATEGORY } from '../../../../core/entities/transaction.entity';
@@ -33,7 +33,7 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
     workspaceId: string,
     filters: ListTransactionsFilters,
   ): Promise<PaginatedResult<TransactionEntity>> {
-    const { page, limit, type, category, accountId, startDate, endDate, search, status } = filters;
+    const { page, limit, type, category, accountId, startDate, endDate, search, status, order } = filters;
     const { limit: lim, offset } = paginate(page, limit);
 
     const conditions: SQL[] = [eq(schema.transaction.workspaceId, workspaceId)];
@@ -67,7 +67,11 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
       .from(schema.transaction)
       .where(where)
       // Extrato: mais recentes primeiro.
-      .orderBy(desc(schema.transaction.date), desc(schema.transaction.createdAt))
+      .orderBy(
+        ...(order === 'asc'
+          ? [asc(schema.transaction.date), asc(schema.transaction.createdAt)]
+          : [desc(schema.transaction.date), desc(schema.transaction.createdAt)]),
+      )
       .limit(lim)
       .offset(offset);
 
@@ -116,10 +120,22 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
         pendingIncome: sql<string>`coalesce(sum(${t.amount}) filter (where ${t.type} = 'income' and ${t.status} = 'pending'), 0)`,
         pendingExpense: sql<string>`coalesce(sum(${t.amount}) filter (where ${t.type} = 'expense' and ${t.status} = 'pending'), 0)`,
         pendingCount: sql<string>`count(*) filter (where ${t.status} = 'pending')`,
-        overdueCount: sql<string>`count(*) filter (where ${t.status} = 'pending' and ${t.date} < ${filters.today})`,
       })
       .from(schema.transaction)
       .where(and(where, ne(schema.transaction.category, ADJUSTMENT_CATEGORY)));
+
+    // Atrasadas: todas as pendências vencidas, de qualquer período (uma conta
+    // de meses atrás continua atrasada mesmo olhando o mês atual).
+    const overdueConditions: SQL[] = [
+      eq(t.workspaceId, workspaceId),
+      eq(t.status, 'pending'),
+      lt(t.date, filters.today),
+    ];
+    if (filters.accountId) overdueConditions.push(eq(t.bankAccountId, filters.accountId));
+    const [overdue] = await this.db
+      .select({ n: count() })
+      .from(schema.transaction)
+      .where(and(...overdueConditions));
 
     const dates = await this.db
       .selectDistinct({ date: schema.transaction.date })
@@ -139,7 +155,7 @@ export class DrizzleTransactionRepository implements ITransactionRepository {
       pendingIncome: Number(totals?.pendingIncome ?? 0),
       pendingExpense: Number(totals?.pendingExpense ?? 0),
       pendingCount: Number(totals?.pendingCount ?? 0),
-      overdueCount: Number(totals?.overdueCount ?? 0),
+      overdueCount: Number(overdue?.n ?? 0),
       activeDates: dates.map((d) => d.date),
     };
   }

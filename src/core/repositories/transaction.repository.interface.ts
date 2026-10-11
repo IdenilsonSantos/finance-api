@@ -14,6 +14,8 @@ export interface ListTransactionsFilters {
   endDate?: string;
   search?: string;
   status?: TransactionStatus;
+  /** Ordem por data; padrão `desc` (mais recentes primeiro). */
+  order?: 'asc' | 'desc';
 }
 
 export interface TransactionsSummaryFilters {
@@ -37,7 +39,7 @@ export interface TransactionsSummary {
   /** Despesas pendentes (a pagar) no período. */
   pendingExpense: number;
   pendingCount: number;
-  /** Pendências com data anterior a hoje. */
+  /** Pendências com data anterior a hoje, de qualquer período. */
   overdueCount: number;
   /** Datas (YYYY-MM-DD) com ao menos uma movimentação no período. */
   activeDates: string[];

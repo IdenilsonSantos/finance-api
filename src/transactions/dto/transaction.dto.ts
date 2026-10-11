@@ -125,6 +125,15 @@ export class ListTransactionsDto extends PaginationDto {
   @IsOptional()
   @IsIn(TRANSACTION_STATUSES)
   status?: TransactionStatus;
+
+  @ApiPropertyOptional({
+    enum: ['asc', 'desc'],
+    default: 'desc',
+    description: '`asc` lista as contas a vencer na ordem de vencimento',
+  })
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  order?: 'asc' | 'desc';
 }
 
 export class TransactionsSummaryDto {
