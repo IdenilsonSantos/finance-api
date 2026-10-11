@@ -98,6 +98,13 @@ export class TransactionsService {
   async update(id: string, workspaceId: string, dto: UpdateTransactionDto, userId: string) {
     const old = await this.findOne(id, workspaceId);
 
+    // Sem esta checagem, mover a transação para uma conta de outro workspace
+    // alteraria o saldo dela (updateBalance não filtra por workspace).
+    if (dto.bankAccountId && dto.bankAccountId !== old.bankAccountId) {
+      const target = await this.bankAccountRepository.findById(dto.bankAccountId, workspaceId);
+      if (!target) throw new NotFoundException('Conta bancária não encontrada');
+    }
+
     const newBankAccountId = dto.bankAccountId ?? old.bankAccountId;
     const newAmountInCents = dto.amount !== undefined ? Math.round(dto.amount * 100) : old.amount;
     const newType = dto.type ?? old.type;
