@@ -1,4 +1,4 @@
-import { invoiceMonthForDate, invoicePeriod } from './credit-card';
+import { invoiceMonthForDate, invoicePeriod, invoiceRemaining } from './credit-card';
 
 describe('credit card invoices', () => {
   describe('fecha dia 25, vence dia 5 (fechamento no mês anterior)', () => {
@@ -49,6 +49,37 @@ describe('credit card invoices', () => {
     expect(march.closingDate).toBe('2024-02-29');
     expect(march.start).toBe('2024-01-31');
     expect(invoiceMonthForDate('2024-02-29', cycle)).toBe('2024-04');
+  });
+
+  describe('invoiceRemaining (pagamentos abatem as faturas mais antigas)', () => {
+    it('fatura sem pagamento: falta o total', () => {
+      // deve 1000 desta fatura + 300 de compras posteriores
+      expect(invoiceRemaining(1000, 1300, 300)).toBe(1000);
+    });
+
+    it('pagamento antecipado, feito antes do fechamento, quita a fatura', () => {
+      // pagou os 1000 antes de fechar; só restam as compras posteriores
+      expect(invoiceRemaining(1000, 300, 300)).toBe(0);
+    });
+
+    it('pagamento parcial', () => {
+      expect(invoiceRemaining(1000, 700, 300)).toBe(400);
+    });
+
+    it('fatura antiga em atraso continua devendo mesmo com compras novas', () => {
+      // fatura de 1000 não paga + fatura seguinte de 500 + 200 em aberto
+      expect(invoiceRemaining(1000, 1700, 700)).toBe(1000);
+      // a fatura seguinte também não foi paga
+      expect(invoiceRemaining(500, 1700, 200)).toBe(500);
+    });
+
+    it('pagou a mais: nada a pagar', () => {
+      expect(invoiceRemaining(1000, 0, 300)).toBe(0);
+    });
+
+    it('fatura só com estornos não tem o que pagar', () => {
+      expect(invoiceRemaining(-50, 400, 0)).toBe(0);
+    });
   });
 
   it('períodos consecutivos não se sobrepõem nem deixam buracos', () => {

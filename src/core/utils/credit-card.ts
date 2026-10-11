@@ -54,6 +54,22 @@ export function invoicePeriod(month: string, cycle: CardCycle): InvoicePeriod {
   };
 }
 
+/**
+ * Quanto ainda falta pagar de uma fatura, aplicando os pagamentos às faturas
+ * mais antigas primeiro (como os bancos): a dívida atual do cartão menos o
+ * que foi comprado depois do fechamento desta fatura, limitado ao total dela.
+ * Funciona para pagamento antecipado (antes do fechamento), parcial ou
+ * atrasado, sem depender da data da transferência.
+ *
+ * @param total valor da fatura (compras - estornos do período)
+ * @param outstanding dívida atual do cartão (saldo negativo, em positivo)
+ * @param chargesAfter compras - estornos lançados depois do período da fatura
+ */
+export function invoiceRemaining(total: number, outstanding: number, chargesAfter: number): number {
+  if (total <= 0) return 0;
+  return Math.min(total, Math.max(0, outstanding - chargesAfter));
+}
+
 /** Mês da fatura em que entra uma compra feita em `date` (YYYY-MM-DD). */
 export function invoiceMonthForDate(date: string, cycle: CardCycle): string {
   const d = parseISODate(date);

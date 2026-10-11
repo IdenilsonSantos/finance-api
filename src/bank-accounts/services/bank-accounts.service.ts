@@ -1,11 +1,11 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, count, eq, gte, lte } from 'drizzle-orm';
+import { and, count, eq, gt, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
 import { ADJUSTMENT_CATEGORY } from '../../core/entities/transaction.entity';
 import { todayISO } from '../../core/utils/date';
-import { invoiceMonthForDate, invoicePeriod, shiftMonth } from '../../core/utils/credit-card';
+import { invoiceMonthForDate, invoicePeriod, invoiceRemaining } from '../../core/utils/credit-card';
 import { BankAccountEntity, BankAccountType } from '../../core/entities/bank-account.entity';
 import {
   AdjustBalanceDto,
@@ -237,8 +237,8 @@ export class BankAccountsService {
 
   /**
    * Fatura do cartão de crédito. O pagamento é registrado como transferência
-   * de outra conta para o cartão; conta como pagamento desta fatura toda
-   * transferência feita entre o fechamento dela e o fechamento seguinte.
+   * de outra conta para o cartão e abate as faturas mais antigas primeiro
+   * (ver invoiceRemaining), independentemente da data da transferência.
    */
   async getInvoice(id: string, workspaceId: string, query: InvoiceQueryDto) {
     const account = await this.findOne(id, workspaceId);
@@ -250,7 +250,6 @@ export class BankAccountsService {
     const today = todayISO();
     const month = query.month ?? invoiceMonthForDate(today, cycle);
     const period = invoicePeriod(month, cycle);
-    const next = invoicePeriod(shiftMonth(month, 1), cycle);
 
     const transactions = (
       await this.transactionRepository.findByBankAccountInDateRange(id, period.start, period.end)
@@ -263,18 +262,18 @@ export class BankAccountsService {
       0,
     );
 
-    const payments = await this.db
-      .select({ amount: schema.transfer.amount })
-      .from(schema.transfer)
-      .where(
-        and(
-          eq(schema.transfer.toAccountId, id),
-          gte(schema.transfer.date, period.closingDate),
-          lte(schema.transfer.date, next.end),
-        ),
-      );
-    const paidAmount = payments.reduce((acc, p) => acc + p.amount, 0);
-    const remaining = Math.max(0, total - paidAmount);
+    // Compras (menos estornos) lançadas depois do período desta fatura: são a
+    // parte da dívida atual que pertence às faturas seguintes.
+    const [after] = await this.db
+      .select({
+        net: sql<string>`coalesce(sum(case when ${schema.transaction.type} = 'expense' then ${schema.transaction.amount} else -${schema.transaction.amount} end), 0)`,
+      })
+      .from(schema.transaction)
+      .where(and(eq(schema.transaction.bankAccountId, id), gt(schema.transaction.date, period.end)));
+
+    const outstanding = Math.max(0, -account.balance);
+    const remaining = invoiceRemaining(total, outstanding, Number(after?.net ?? 0));
+    const paidAmount = Math.max(0, total) - remaining;
 
     let status: InvoiceStatus;
     if (today < period.closingDate) status = 'open';
