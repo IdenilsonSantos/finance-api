@@ -1,4 +1,4 @@
-import { addDays, addMonths, addWeeks, addYears, format } from 'date-fns';
+import { addDays, addMonths, addWeeks, addYears, format, getDaysInMonth } from 'date-fns';
 
 /**
  * Fuso usado para decidir "que dia é hoje" (agendamentos, ajustes de saldo).
@@ -33,25 +33,49 @@ export function toISODate(date: Date): string {
 
 export type RecurrenceFrequency = 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
+/** Mesma data com o dia trocado por `day`, limitado ao último dia do mês. */
+export function withClampedDay(date: Date, day: number): Date {
+  const result = new Date(date);
+  result.setDate(1);
+  result.setDate(Math.min(day, getDaysInMonth(result)));
+  return result;
+}
+
 /**
  * Próxima ocorrência de uma recorrência. Mensal/anual usam o mesmo
  * comportamento dos bancos: 31/01 + 1 mês = 29/02 (último dia do mês),
- * nunca "transborda" para março.
+ * nunca "transborda" para março. Com `anchorDay`, a data volta ao dia
+ * original assim que o mês permitir (29/02 → 31/03), sem "escorregar".
  */
-export function nextOccurrence(frequency: RecurrenceFrequency, current: string): string | null {
+export function nextOccurrence(
+  frequency: RecurrenceFrequency,
+  current: string,
+  anchorDay?: number | null,
+): string | null {
   const date = parseISODate(current);
   switch (frequency) {
     case 'daily':
       return toISODate(addDays(date, 1));
     case 'weekly':
       return toISODate(addWeeks(date, 1));
-    case 'monthly':
-      return toISODate(addMonths(date, 1));
-    case 'yearly':
-      return toISODate(addYears(date, 1));
+    case 'monthly': {
+      const next = addMonths(date, 1);
+      return toISODate(anchorDay ? withClampedDay(next, anchorDay) : next);
+    }
+    case 'yearly': {
+      const next = addYears(date, 1);
+      return toISODate(anchorDay ? withClampedDay(next, anchorDay) : next);
+    }
     default:
       return null;
   }
+}
+
+/** Dia âncora a guardar para a recorrência (só mensal/anual usam). */
+export function anchorDayFor(frequency: RecurrenceFrequency, nextDate: string): number | null {
+  return frequency === 'monthly' || frequency === 'yearly'
+    ? parseISODate(nextDate).getDate()
+    : null;
 }
 
 /** Último dia (YYYY-MM-DD) de um mês YYYY-MM. */

@@ -18,7 +18,7 @@ import {
   UpdateScheduledTransactionDto,
   ListScheduledTransactionsDto,
 } from '../dto/scheduled-transaction.dto';
-import { APP_TIMEZONE, nextOccurrence, todayISO } from '../../core/utils/date';
+import { APP_TIMEZONE, anchorDayFor, nextOccurrence, todayISO } from '../../core/utils/date';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 
@@ -54,6 +54,7 @@ export class ScheduledTransactionsService {
     return this.scheduledTransactionRepository.create({
       ...dto,
       amount: amountInCents,
+      dayOfMonth: anchorDayFor(dto.frequency, dto.nextDate),
       workspaceId,
     });
   }
@@ -92,6 +93,13 @@ export class ScheduledTransactionsService {
     const data: Record<string, any> = { ...dto };
     if (dto.amount !== undefined) {
       data.amount = Math.round(dto.amount * 100);
+    }
+    // Uma nova data/frequência redefine o dia âncora da recorrência.
+    if (dto.nextDate !== undefined || dto.frequency !== undefined) {
+      data.dayOfMonth = anchorDayFor(
+        dto.frequency ?? current.frequency,
+        dto.nextDate ?? current.nextDate,
+      );
     }
 
     return this.scheduledTransactionRepository.update(id, workspaceId, data);
@@ -137,7 +145,7 @@ export class ScheduledTransactionsService {
   private async runOccurrence(
     scheduled: ScheduledTransactionEntity,
   ): Promise<{ executed: boolean; next: ScheduledTransactionEntity | null }> {
-    const candidate = nextOccurrence(scheduled.frequency, scheduled.nextDate);
+    const candidate = nextOccurrence(scheduled.frequency, scheduled.nextDate, scheduled.dayOfMonth);
     const finished =
       !candidate || (!!scheduled.endDate && candidate > scheduled.endDate);
     const newNextDate = finished ? null : candidate;

@@ -116,6 +116,9 @@ export const scheduledTransaction = pgTable('scheduledTransaction', {
   }).notNull(),
   nextDate: date('nextDate').notNull(),
   endDate: date('endDate'),
+  // Dia "âncora" de recorrências mensais/anuais: depois de cair num mês mais
+  // curto (31 → 29/02), a próxima ocorrência volta ao dia original (31/03).
+  dayOfMonth: integer('dayOfMonth'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });

@@ -23,6 +23,14 @@ describe('date utils', () => {
       expect(nextOccurrence('yearly', '2024-02-29')).toBe('2025-02-28');
     });
 
+    it('com dia âncora, volta ao dia original depois de um mês curto', () => {
+      expect(nextOccurrence('monthly', '2024-02-29', 31)).toBe('2024-03-31');
+      expect(nextOccurrence('monthly', '2024-03-31', 31)).toBe('2024-04-30');
+      expect(nextOccurrence('monthly', '2024-04-30', 31)).toBe('2024-05-31');
+      expect(nextOccurrence('yearly', '2025-02-28', 29)).toBe('2026-02-28');
+      expect(nextOccurrence('yearly', '2027-02-28', 29)).toBe('2028-02-29');
+    });
+
     it('única não tem próxima ocorrência', () => {
       expect(nextOccurrence('once', '2024-01-01')).toBeNull();
     });

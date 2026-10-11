@@ -15,6 +15,7 @@ function makeScheduled(overrides: Partial<ScheduledTransactionEntity> = {}): Sch
     frequency: 'monthly',
     nextDate: '2024-01-31',
     endDate: null,
+    dayOfMonth: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -70,6 +71,37 @@ describe('ScheduledTransactionsService', () => {
     );
     expect(bankAccountRepo.updateBalance).toHaveBeenCalledWith('acc-1', -10000, db);
     expect(next?.nextDate).toBe('2024-02-29');
+  });
+
+  it('execute volta ao dia âncora depois de um mês curto', async () => {
+    scheduledRepo.findById.mockResolvedValue(
+      makeScheduled({ nextDate: '2024-02-29', dayOfMonth: 31 }),
+    );
+
+    const next = await service.execute('sch-1', 'ws-1');
+
+    expect(scheduledRepo.claimOccurrence).toHaveBeenCalledWith('sch-1', '2024-02-29', '2024-03-31', db);
+    expect(next?.nextDate).toBe('2024-03-31');
+  });
+
+  it('create guarda o dia âncora de recorrências mensais', async () => {
+    scheduledRepo.create = jest.fn().mockResolvedValue({});
+
+    await service.create(
+      {
+        bankAccountId: 'acc-1',
+        amount: 10,
+        type: 'expense',
+        category: 'housing',
+        frequency: 'monthly',
+        nextDate: '2024-01-31',
+      },
+      'ws-1',
+    );
+
+    expect(scheduledRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ dayOfMonth: 31, amount: 1000 }),
+    );
   });
 
   it('execute encerra o agendamento quando a próxima data passa do término', async () => {
