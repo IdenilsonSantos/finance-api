@@ -84,6 +84,14 @@ describe('ScheduledTransactionsService', () => {
     expect(next?.nextDate).toBe('2024-03-31');
   });
 
+  it('execute recusa conta arquivada', async () => {
+    scheduledRepo.findById.mockResolvedValue(makeScheduled());
+    bankAccountRepo.findById.mockResolvedValue({ id: 'acc-1', name: 'Nubank', archivedAt: new Date() });
+
+    await expect(service.execute('sch-1', 'ws-1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(transactionRepo.create).not.toHaveBeenCalled();
+  });
+
   it('create guarda o dia âncora de recorrências mensais', async () => {
     scheduledRepo.create = jest.fn().mockResolvedValue({});
 

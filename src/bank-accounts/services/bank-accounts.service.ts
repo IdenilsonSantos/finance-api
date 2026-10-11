@@ -1,4 +1,5 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import { count, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { IBankAccountRepository } from '../../core/repositories/bank-account.repository.interface';
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
@@ -131,6 +132,65 @@ export class BankAccountsService {
       entityType: 'bankAccount',
       entityId: id,
       metadata: { name: account.name, from: account.balance, to: updated.balance },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Arquiva a conta: some dos seletores e da visão geral, mas o histórico
+   * continua nos relatórios. Exige saldo zerado (como nos apps de finanças),
+   * para que o patrimônio total continue correto.
+   */
+  async archive(id: string, workspaceId: string, userId: string) {
+    const account = await this.findOne(id, workspaceId);
+    if (account.archivedAt) return account;
+
+    if (account.balance !== 0) {
+      throw new BadRequestException(
+        'Zere o saldo da conta (com uma transferência ou ajuste de saldo) antes de arquivá-la',
+      );
+    }
+
+    const [{ pending }] = await this.db
+      .select({ pending: count() })
+      .from(schema.scheduledTransaction)
+      .where(eq(schema.scheduledTransaction.bankAccountId, id));
+    if (Number(pending) > 0) {
+      throw new BadRequestException(
+        'Esta conta tem agendamentos ativos. Remova-os ou mova-os para outra conta antes de arquivar.',
+      );
+    }
+
+    const updated = await this.bankAccountRepository.update(id, workspaceId, {
+      archivedAt: new Date(),
+    });
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'bankAccount.archived',
+      entityType: 'bankAccount',
+      entityId: id,
+      metadata: { name: account.name },
+    });
+
+    return updated;
+  }
+
+  async unarchive(id: string, workspaceId: string, userId: string) {
+    const account = await this.findOne(id, workspaceId);
+    if (!account.archivedAt) return account;
+
+    const updated = await this.bankAccountRepository.update(id, workspaceId, { archivedAt: null });
+
+    this.activityService.log({
+      workspaceId,
+      userId,
+      action: 'bankAccount.unarchived',
+      entityType: 'bankAccount',
+      entityId: id,
+      metadata: { name: account.name },
     });
 
     return updated;

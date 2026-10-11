@@ -9,6 +9,7 @@ export class BankAccountEntity {
   balance: number;
   /** Data até a qual `balance` está confirmado por um extrato importado (nulo se nunca importou). */
   balanceAsOf: string | null;
+  archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 

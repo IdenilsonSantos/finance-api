@@ -16,6 +16,7 @@ import {
 import { ActivityService } from '../../activity/activity.service';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
+import { assertAccountActive } from '../../core/utils/accounts';
 
 const FREE_PLAN_TRANSACTION_LIMIT = 50;
 
@@ -49,6 +50,7 @@ export class TransactionsService {
       workspaceId,
     );
     if (!account) throw new NotFoundException('Conta bancária não encontrada');
+    assertAccountActive(account);
 
     const amountInCents = Math.round(dto.amount * 100);
 
@@ -113,9 +115,12 @@ export class TransactionsService {
 
     // Sem esta checagem, mover a transação para uma conta de outro workspace
     // alteraria o saldo dela (updateBalance não filtra por workspace).
+    const oldAccount = await this.bankAccountRepository.findById(old.bankAccountId, workspaceId);
+    if (oldAccount) assertAccountActive(oldAccount);
     if (dto.bankAccountId && dto.bankAccountId !== old.bankAccountId) {
       const target = await this.bankAccountRepository.findById(dto.bankAccountId, workspaceId);
       if (!target) throw new NotFoundException('Conta bancária não encontrada');
+      assertAccountActive(target);
     }
 
     const newBankAccountId = dto.bankAccountId ?? old.bankAccountId;
@@ -156,6 +161,8 @@ export class TransactionsService {
 
   async remove(id: string, workspaceId: string, userId: string) {
     const tx = await this.findOne(id, workspaceId);
+    const account = await this.bankAccountRepository.findById(tx.bankAccountId, workspaceId);
+    if (account) assertAccountActive(account);
 
     await this.db.transaction(async (trx) => {
       await this.transactionRepository.delete(id, workspaceId, trx);

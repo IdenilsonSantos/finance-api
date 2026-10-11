@@ -19,6 +19,7 @@ import {
   ListScheduledTransactionsDto,
 } from '../dto/scheduled-transaction.dto';
 import { APP_TIMEZONE, anchorDayFor, nextOccurrence, todayISO } from '../../core/utils/date';
+import { assertAccountActive } from '../../core/utils/accounts';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
 
@@ -47,6 +48,7 @@ export class ScheduledTransactionsService {
       workspaceId,
     );
     if (!account) throw new NotFoundException('Conta bancária não encontrada');
+    assertAccountActive(account);
     this.assertEndDate(dto.nextDate, dto.endDate);
 
     const amountInCents = Math.round(dto.amount * 100);
@@ -83,6 +85,7 @@ export class ScheduledTransactionsService {
     if (dto.bankAccountId && dto.bankAccountId !== current.bankAccountId) {
       const account = await this.bankAccountRepository.findById(dto.bankAccountId, workspaceId);
       if (!account) throw new NotFoundException('Conta bancária não encontrada');
+      assertAccountActive(account);
     }
 
     this.assertEndDate(
@@ -125,6 +128,7 @@ export class ScheduledTransactionsService {
       workspaceId,
     );
     if (!account) throw new NotFoundException('Conta bancária não encontrada');
+    assertAccountActive(account);
 
     const result = await this.runOccurrence(scheduled);
     if (!result.executed) {
@@ -233,6 +237,10 @@ export class ScheduledTransactionsService {
         );
         if (!account) {
           this.logger.warn(`Conta ${initial.bankAccountId} não encontrada para scheduled ${initial.id} — pulando`);
+          continue;
+        }
+        if (account.archivedAt) {
+          this.logger.warn(`Conta ${initial.bankAccountId} arquivada para scheduled ${initial.id} — pulando`);
           continue;
         }
 

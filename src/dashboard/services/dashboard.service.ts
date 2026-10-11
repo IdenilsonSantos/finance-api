@@ -288,13 +288,16 @@ export class DashboardService {
       .sort((a, b) => b.value - a.value);
 
     return {
-      accounts: accounts.map((a) => ({
-        id: a.id,
-        name: a.name,
-        type: a.type,
-        balance: a.balance,
-        color: a.color,
-      })),
+      // Arquivadas têm saldo zero (regra do arquivamento): saem só da lista.
+      accounts: accounts
+        .filter((a) => !a.archivedAt)
+        .map((a) => ({
+          id: a.id,
+          name: a.name,
+          type: a.type,
+          balance: a.balance,
+          color: a.color,
+        })),
 
       financialInsights: {
         totalBalance,

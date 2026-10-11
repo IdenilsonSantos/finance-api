@@ -90,6 +90,30 @@ export class BankAccountsController {
     return this.bankAccountsService.update(id, workspaceId, dto, userId);
   }
 
+  @Post(':id/archive')
+  @ApiOperation({ summary: 'Archive an account (requires zero balance)' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 201, description: 'Account archived' })
+  archive(
+    @WorkspaceId() workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
+  ) {
+    return this.bankAccountsService.archive(id, workspaceId, userId);
+  }
+
+  @Post(':id/unarchive')
+  @ApiOperation({ summary: 'Unarchive an account' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 201, description: 'Account unarchived' })
+  unarchive(
+    @WorkspaceId() workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('userId') userId: string,
+  ) {
+    return this.bankAccountsService.unarchive(id, workspaceId, userId);
+  }
+
   @Post(':id/adjust-balance')
   @ApiOperation({ summary: 'Set the account balance, recording the difference as an adjustment' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })

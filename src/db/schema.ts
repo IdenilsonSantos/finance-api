@@ -75,6 +75,8 @@ export const bankAccount = pgTable('bankAccount', {
   // Data até a qual o saldo acima está confirmado por extrato importado
   // (LEDGERBAL). Nulo se a conta nunca teve extrato importado.
   balanceAsOf: date('balanceAsOf'),
+  // Contas arquivadas saem dos seletores e totais, mas mantêm o histórico.
+  archivedAt: timestamp('archivedAt'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
 });

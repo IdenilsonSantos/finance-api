@@ -13,6 +13,7 @@ import { IBankAccountRepository } from '../../core/repositories/bank-account.rep
 import { ITransactionRepository } from '../../core/repositories/transaction.repository.interface';
 import { DRIZZLE } from '../../db/database.module';
 import * as schema from '../../db/schema';
+import { assertAccountActive } from '../../core/utils/accounts';
 
 const FREE_PLAN_TRANSACTION_LIMIT = 50;
 
@@ -117,7 +118,7 @@ export class StatementImportService {
       const type = accountInfo?.type ?? 'checking';
 
       const existing = await this.db
-        .select({ id: schema.bankAccount.id })
+        .select({ id: schema.bankAccount.id, name: schema.bankAccount.name, archivedAt: schema.bankAccount.archivedAt })
         .from(schema.bankAccount)
         .where(
           and(
@@ -129,6 +130,7 @@ export class StatementImportService {
         .then((r) => r[0]);
 
       if (existing) {
+        if (existing.archivedAt) assertAccountActive(existing);
         resolvedAccountId = existing.id;
       } else {
         const created = await this.bankAccountRepository.create({
@@ -144,6 +146,7 @@ export class StatementImportService {
     } else {
       const account = await this.bankAccountRepository.findById(resolvedAccountId, workspaceId);
       if (!account) throw new NotFoundException('Conta bancária não encontrada');
+      assertAccountActive(account);
     }
 
     if (parsed.length === 0) return { imported: 0, duplicates: 0, total: 0, accountCreated };
