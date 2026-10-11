@@ -16,6 +16,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { AdminModule } from './admin/admin.module';
 import { AlertsModule } from './alerts/alerts.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { CategoriesModule } from './categories/categories.module';
     GoalsModule,
     AlertsModule,
     CategoriesModule,
+    ReportsModule,
     DashboardModule,
     AdminModule,
   ],
