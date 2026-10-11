@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsPositive, IsDateString, IsUUID, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsPositive, IsDateString, IsUUID, IsOptional, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationDto } from '../../core/dto/pagination.dto';
 
@@ -41,4 +41,33 @@ export class CreateTransferDto {
   @ApiProperty({ example: '2024-01-15' })
   @IsDateString()
   date!: string;
+}
+
+export class UpdateTransferDto {
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  fromAccountId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  toAccountId?: string;
+
+  @ApiPropertyOptional({ example: 500.0 })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'amount must be a number with up to 2 decimal places' })
+  @IsPositive()
+  amount?: number;
+
+  @ApiPropertyOptional({ example: 'Reserva', nullable: true })
+  @IsOptional()
+  @ValidateIf((o) => o.description !== null)
+  @IsString()
+  description?: string | null;
+
+  @ApiPropertyOptional({ example: '2024-01-15' })
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }

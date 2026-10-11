@@ -15,5 +15,6 @@ export interface ITransferRepository {
   findById(id: string, workspaceId: string): Promise<TransferEntity | null>;
   findAllByWorkspace(workspaceId: string, filters: ListTransfersFilters): Promise<PaginatedResult<TransferEntity>>;
   create(data: Partial<TransferEntity>, trx?: any): Promise<TransferEntity>;
+  update(id: string, workspaceId: string, data: Partial<TransferEntity>, trx?: any): Promise<TransferEntity>;
   delete(id: string, workspaceId: string, trx?: any): Promise<void>;
 }

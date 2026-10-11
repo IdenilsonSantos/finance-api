@@ -79,6 +79,21 @@ export class DrizzleTransferRepository implements ITransferRepository {
     return new TransferEntity(result);
   }
 
+  async update(
+    id: string,
+    workspaceId: string,
+    data: Partial<TransferEntity>,
+    trx?: any,
+  ): Promise<TransferEntity> {
+    const db = trx || this.db;
+    const [result] = await db
+      .update(schema.transfer)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(schema.transfer.id, id), eq(schema.transfer.workspaceId, workspaceId)))
+      .returning();
+    return new TransferEntity(result);
+  }
+
   async delete(id: string, workspaceId: string, trx?: any): Promise<void> {
     const db = trx || this.db;
     await db
